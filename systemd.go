@@ -59,6 +59,7 @@ func (c *Container) isSystemShutdown() bool {
 func (c *Container) machinectlPoweroff() error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
+	// Lock container, while it is stopping.
 
 	cmd := exec.Command("/usr/bin/machinectl", "poweroff", c.name)
 	b, err := cmd.CombinedOutput()
