@@ -13,7 +13,7 @@ type Container struct {
 	lock sync.RWMutex
 
 	name       string
-	fs         *Filesystem
+	fs         *FileSystem
 	properties []string
 
 	boot       bool
@@ -29,7 +29,7 @@ type Container struct {
 func New(name, baseDir string) *Container {
 	c := &Container{
 		name:       name,
-		fs:         new(Filesystem),
+		fs:         new(FileSystem),
 		properties: []string{},
 		boot:       true,
 		cancelBoot: make(chan struct{}),
@@ -161,10 +161,10 @@ func (c *Container) Unmount() error {
 	return c.fs.unmount()
 }
 
-// Filesystem returns a Filesystem structure copy of the internal one.
+// FileSystem returns a FileSystem structure copy of the internal one.
 // So modify it won't take any effect in the container.
-func (c *Container) Filesystem() Filesystem {
-	var fs Filesystem
+func (c *Container) FileSystem() FileSystem {
+	var fs FileSystem
 	fs = *c.fs
 	return fs
 }

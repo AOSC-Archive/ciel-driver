@@ -10,7 +10,7 @@ import (
 	"syscall"
 )
 
-type Filesystem struct {
+type FileSystem struct {
 	lock sync.RWMutex
 
 	Workdir    string `role:"work"  dir:"99-workdir"`
@@ -27,7 +27,7 @@ type Filesystem struct {
 
 const _SYSTEMDPATH = "/usr/lib/systemd/systemd"
 
-func (fs *Filesystem) isBootable() bool {
+func (fs *FileSystem) isBootable() bool {
 	fs.lock.RLock()
 	defer fs.lock.RUnlock()
 
@@ -40,13 +40,13 @@ func (fs *Filesystem) isBootable() bool {
 	return true
 }
 
-func (fs *Filesystem) isMounted() bool {
+func (fs *FileSystem) isMounted() bool {
 	fs.lock.RLock()
 	defer fs.lock.RUnlock()
 	return fs.mounted
 }
 
-func (fs *Filesystem) setBaseDir(path string) {
+func (fs *FileSystem) setBaseDir(path string) {
 	fs.lock.Lock()
 	defer fs.lock.Unlock()
 
@@ -71,7 +71,7 @@ func (fs *Filesystem) setBaseDir(path string) {
 	}
 }
 
-func (fs *Filesystem) mount() error {
+func (fs *FileSystem) mount() error {
 	fs.lock.Lock()
 	defer fs.lock.Unlock()
 
@@ -95,7 +95,7 @@ func (fs *Filesystem) mount() error {
 	return reterr
 }
 
-func (fs *Filesystem) unmount() error {
+func (fs *FileSystem) unmount() error {
 	fs.lock.Lock()
 	defer fs.lock.Unlock()
 	if !fs.mounted {
