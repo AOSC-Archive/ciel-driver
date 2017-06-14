@@ -2,10 +2,12 @@ package ciel
 
 import (
 	"context"
+	"io"
+	"os"
 	"sync"
 )
 
-const _SHELLPATH = "/bin/bash"
+const SHELLPATH = "/bin/bash"
 
 type Container struct {
 	lock sync.RWMutex
@@ -37,13 +39,13 @@ func New(name, baseDir string) *Container {
 	return c
 }
 
-// Command is the most useful function.
-// It calls the command line with shell (bash) in container, returns the exit code.
+// Command calls the command line with shell ("SHELLPATH -l -c <cmdline>") in container,
+// returns the exit code.
 //
 // Don't worry about mounting file system, starting container and the mode of booting.
 // Please check out CommandRaw() for more details.
 //
-// NOTE: It calls CommandRaw() internally.
+// NOTE: It calls CommandRaw() internally, using os.Stdin, os.Stdout, os.Stderr.
 func (c *Container) Command(cmdline string) int {
 	return c.CommandContext(context.Background(), cmdline)
 }
@@ -53,17 +55,19 @@ func (c *Container) Command(cmdline string) int {
 // It will mount the root file system and start the container automatically,
 // when they are not active. It can also choose boot-mode and chroot-mode automatically.
 // You may change this behaviour by SetPreference().
-func (c *Container) CommandRaw(proc string, args ...string) int {
-	return c.CommandRawContext(context.Background(), proc, args...)
+//
+// stdin, stdout and stderr can be nil.
+func (c *Container) CommandRaw(proc string, stdin io.Reader, stdout, stderr io.Writer, args ...string) int {
+	return c.CommandRawContext(context.Background(), proc, stdin, stdout, stderr, args...)
 }
 
 // CommandContext is Command() with context.
 func (c *Container) CommandContext(ctx context.Context, cmdline string) int {
-	return c.CommandRawContext(ctx, _SHELLPATH, "-l", "-c", cmdline)
+	return c.CommandRawContext(ctx, SHELLPATH, os.Stdin, os.Stdout, os.Stderr, "-l", "-c", cmdline)
 }
 
 // CommandRawContext is CommandRaw() with context.
-func (c *Container) CommandRawContext(ctx context.Context, proc string, args ...string) int {
+func (c *Container) CommandRawContext(ctx context.Context, proc string, stdin io.Reader, stdout, stderr io.Writer, args ...string) int {
 	if !c.IsFileSystemMounted() {
 		if err := c.Mount(); err != nil {
 			panic(err)
@@ -74,13 +78,13 @@ func (c *Container) CommandRawContext(ctx context.Context, proc string, args ...
 	boot := c.boot
 	c.lock.RUnlock()
 	if booted {
-		return c.systemdRun(ctx, proc, args...)
+		return c.systemdRun(ctx, proc, stdin, stdout, stderr, args...)
 	} else {
 		if boot && c.IsBootable() {
 			c.systemdNspawnBoot()
-			return c.systemdRun(ctx, proc, args...)
+			return c.systemdRun(ctx, proc, stdin, stdout, stderr, args...)
 		} else {
-			return c.systemdNspawnRun(ctx, proc, args...)
+			return c.systemdNspawnRun(ctx, proc, stdin, stdout, stderr, args...)
 		}
 	}
 }
