@@ -53,7 +53,7 @@ func (c *Container) Command(cmdline string) int {
 // It will mount the root file system and start the container automatically,
 // when they are not active. It can also choose boot-mode and chroot-mode automatically.
 // You may change this behaviour by SetPreference().
-func (c *Container) CommandRaw(proc string, args ...string) (exitCode int) {
+func (c *Container) CommandRaw(proc string, args ...string) int {
 	return c.CommandRawContext(context.Background(), proc, args...)
 }
 
@@ -63,7 +63,7 @@ func (c *Container) CommandContext(ctx context.Context, cmdline string) int {
 }
 
 // CommandRawContext is CommandRaw() with context.
-func (c *Container) CommandRawContext(ctx context.Context, proc string, args ...string) (exitCode int) {
+func (c *Container) CommandRawContext(ctx context.Context, proc string, args ...string) int {
 	if !c.IsFileSystemMounted() {
 		if err := c.Mount(); err != nil {
 			panic(err)
