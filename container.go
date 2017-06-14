@@ -34,7 +34,7 @@ func New(name, baseDir string) *Container {
 		boot:       true,
 		cancelBoot: make(chan struct{}),
 	}
-	c.SetBaseDir(baseDir)
+	c.fs.setBaseDir(baseDir)
 	return c
 }
 
@@ -67,7 +67,7 @@ func (c *Container) CommandContext(ctx context.Context, cmdline string) int {
 
 // CommandRawContext is CommandRaw() with context.
 func (c *Container) CommandRawContext(ctx context.Context, proc string, stdin io.Reader, stdout, stderr io.Writer, args ...string) int {
-	if !c.IsFileSystemMounted() {
+	if !c.IsMounted() {
 		if err := c.Mount(); err != nil {
 			panic(err)
 		}
@@ -94,7 +94,7 @@ func (c *Container) Shutdown() error {
 }
 
 // IsContainerActive returns whether the container is running or not.
-func (c *Container) IsContainerActive() bool {
+func (c *Container) IsActive() bool {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 	return c.booted || c.chrooted
@@ -139,7 +139,7 @@ func (c *Container) SetProperty(property string) {
 }
 
 // IsFileSystemActive returns whether the file system has been mounted or not.
-func (c *Container) IsFileSystemMounted() bool {
+func (c *Container) IsMounted() bool {
 	return c.fs.isMounted()
 }
 
@@ -148,11 +148,6 @@ func (c *Container) IsFileSystemMounted() bool {
 // NOTE: The basis of determining is the file /usr/lib/systemd/systemd.
 func (c *Container) IsBootable() bool {
 	return c.fs.isBootable()
-}
-
-// SetBaseDir sets the base directory for components of the container.
-func (c *Container) SetBaseDir(path string) {
-	c.fs.setBaseDir(path)
 }
 
 // Mount the file system to a temporary directory.

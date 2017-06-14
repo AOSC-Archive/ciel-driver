@@ -104,7 +104,7 @@ func (c *Container) systemdRun(ctx context.Context, proc string, stdin io.Reader
 }
 
 func (c *Container) systemdNspawnRun(ctx context.Context, proc string, stdin io.Reader, stdout, stderr io.Writer, args ...string) int {
-	if c.IsContainerActive() {
+	if c.IsActive() {
 		panic("another chroot-mode instance is running")
 	}
 
