@@ -35,6 +35,10 @@ func (c *Container) systemdNspawnBoot() {
 			c.lock.Unlock()
 		}
 	}()
+
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
 	for !c.isSystemRunning() {
 		select {
 		case <-c.cancelBoot:
@@ -43,9 +47,7 @@ func (c *Container) systemdNspawnBoot() {
 			time.Sleep(time.Millisecond * 100)
 		}
 	}
-	c.lock.Lock()
 	c.booted = true
-	c.lock.Unlock()
 }
 
 func (c *Container) isSystemRunning() bool {
@@ -56,15 +58,22 @@ func (c *Container) isSystemShutdown() bool {
 	return exec.Command("/usr/bin/machinectl", "status", c.name).Run() != nil
 }
 
-func (c *Container) machinectlPoweroff() error {
+func (c *Container) machinectlShutdown() error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	cmd := exec.Command("/usr/bin/machinectl", "poweroff", c.name)
+	var cmd *exec.Cmd
+	if c.booted {
+		cmd = exec.Command("/usr/bin/machinectl", "poweroff", c.name)
+	} else if c.chrooted {
+		cmd = exec.Command("/usr/bin/machinectl", "terminate", c.name)
+	}
+
 	b, err := cmd.CombinedOutput()
 	if err != nil {
 		return errors.New(string(b))
 	}
+
 	for !c.isSystemShutdown() {
 		time.Sleep(time.Millisecond * 100)
 	}

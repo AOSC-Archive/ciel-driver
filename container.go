@@ -75,7 +75,7 @@ func (c *Container) CommandRaw(proc string, args ...string) (exitCode int) {
 
 // Shutdown the container and unmount file system.
 func (c *Container) Shutdown() error {
-	return c.machinectlPoweroff()
+	return c.machinectlShutdown()
 }
 
 // IsContainerActive returns whether the container is running or not.
