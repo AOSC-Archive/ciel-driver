@@ -10,16 +10,16 @@ import (
 
 func (c *Container) systemdNspawnBoot() {
 	c.fs.lock.RLock()
-	cmd := exec.Command("/usr/bin/systemd-nspawn",
+	args := []string{
 		"--quiet",
 		"--boot",
-		// "--property=CPUQuota=80%", // FIXME: configurability
-		// "--property=MemoryMax=70%",
-		// "--property=MemoryHigh=60%",
-		// "--property=MemoryLow=40%",
 		"-M", c.name,
 		"-D", c.fs.target,
-	)
+	}
+	for _, p := range c.properties {
+		args = append(args, "--property="+p)
+	}
+	cmd := exec.Command("/usr/bin/systemd-nspawn", args...)
 	c.fs.lock.RUnlock()
 	if err := cmd.Start(); err != nil {
 		panic(err)

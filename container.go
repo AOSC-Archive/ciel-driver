@@ -9,10 +9,10 @@ const _SHELLPATH = "/bin/bash"
 type Container struct {
 	lock sync.RWMutex
 
-	name string
-	fs   *filesystem
-
-	boot bool
+	name       string
+	fs         *filesystem
+	properties []string
+	boot       bool
 
 	booted   bool
 	chrooted bool
@@ -28,6 +28,7 @@ func New(name, baseDir string) *Container {
 	c := &Container{
 		name:       name,
 		fs:         new(filesystem),
+		properties: []string{},
 		boot:       true,
 		cancelBoot: make(chan struct{}),
 	}
@@ -94,6 +95,32 @@ func (c *Container) IsContainerActive() bool {
 func (c *Container) SetPreference(boot bool) {
 	c.lock.Lock()
 	c.boot = boot
+	c.lock.Unlock()
+}
+
+// SetProperties specifies the properties of container (only for boot-mode).
+//
+// You may use SetProperty() instead. For clear settings, use SetProperties(nil).
+func (c *Container) SetProperties(properties []string) {
+	c.lock.Lock()
+	if properties == nil {
+		properties = []string{}
+	}
+	c.properties = properties
+	c.lock.Unlock()
+}
+
+// SetProperty appends a property of container (only for boot-mode).
+//
+// For understanding what "properties" are,
+// please check out https://www.freedesktop.org/software/systemd/man/systemd.resource-control.html
+//
+// Example:
+//     SetProperty("CPUQuota=80%")
+//     SetProperty("MemoryMax=70%")
+func (c *Container) SetProperty(property string) {
+	c.lock.Lock()
+	c.properties = append(c.properties, property)
 	c.lock.Unlock()
 }
 
