@@ -13,8 +13,8 @@ import (
 type FileSystem struct {
 	lock sync.RWMutex
 
-	Workdir    string `role:"work"  dir:"99-workdir"`
-	Upperdir   string `role:"upper" dir:"99-upperdir"`
+	WorkDir    string `role:"work"  dir:"99-workdir"`
+	UpperDir   string `role:"upper" dir:"99-upperdir"`
 	Cache      string `role:"lower" dir:"50-cache"`
 	Buildkit   string `role:"lower" dir:"10-buildkit"`
 	StubConfig string `role:"lower" dir:"01-stub-config"`
@@ -87,8 +87,8 @@ func (fs *FileSystem) mount() error {
 	}
 	fs.Target = "/tmp/ciel." + randomFilename()
 	os.Mkdir(fs.Target, 0775)
-	os.Mkdir(fs.Workdir, 0775)
-	reterr := mount(fs.Target, fs.Upperdir, fs.Workdir, lowerdirs...)
+	os.Mkdir(fs.WorkDir, 0775)
+	reterr := mount(fs.Target, fs.UpperDir, fs.WorkDir, lowerdirs...)
 	if reterr == nil {
 		fs.mounted = true
 	}
@@ -109,7 +109,7 @@ func (fs *FileSystem) unmount() error {
 		fs.mounted = false
 	}()
 	err1 := os.Remove(fs.Target)
-	err2 := os.RemoveAll(fs.Workdir)
+	err2 := os.RemoveAll(fs.WorkDir)
 	if err2 != nil {
 		return err2
 	}
