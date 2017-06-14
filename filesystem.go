@@ -20,9 +20,9 @@ type filesystem struct {
 	StubConfig string `role:"lower" dir:"01-stub-config"`
 	Stub       string `role:"lower" dir:"00-stub"`
 
-	base   string
-	target string
-	active bool
+	base    string
+	target  string
+	mounted bool
 }
 
 const _SYSTEMDPATH = "/usr/lib/systemd/systemd"
@@ -31,7 +31,7 @@ func (fs *filesystem) IsBootable() bool {
 	fs.lock.RLock()
 	defer fs.lock.RUnlock()
 
-	if !fs.active {
+	if !fs.mounted {
 		return false
 	}
 	if _, err := os.Stat(fs.target + _SYSTEMDPATH); os.IsNotExist(err) {
@@ -40,18 +40,18 @@ func (fs *filesystem) IsBootable() bool {
 	return true
 }
 
-func (fs *filesystem) IsActive() bool {
+func (fs *filesystem) IsMounted() bool {
 	fs.lock.RLock()
 	defer fs.lock.RUnlock()
-	return fs.active
+	return fs.mounted
 }
 
 func (fs *filesystem) SetBaseDir(path string) {
 	fs.lock.Lock()
 	defer fs.lock.Unlock()
 
-	if fs.active {
-		panic("setBaseDir when filesystem is active")
+	if fs.mounted {
+		panic("setBaseDir when filesystem has been mounted")
 	}
 
 	fs.base = path
@@ -90,7 +90,7 @@ func (fs *filesystem) Mount() error {
 	os.Mkdir(fs.Workdir, 0775)
 	reterr := mount(fs.target, fs.Upperdir, fs.Workdir, lowerdirs...)
 	if reterr == nil {
-		fs.active = true
+		fs.mounted = true
 	}
 	return reterr
 }
@@ -98,7 +98,7 @@ func (fs *filesystem) Mount() error {
 func (fs *filesystem) Unmount() error {
 	fs.lock.Lock()
 	defer fs.lock.Unlock()
-	if !fs.active {
+	if !fs.mounted {
 		return nil
 	}
 
@@ -106,7 +106,7 @@ func (fs *filesystem) Unmount() error {
 		return err
 	}
 	defer func() {
-		fs.active = false
+		fs.mounted = false
 	}()
 	err1 := os.Remove(fs.target)
 	err2 := os.RemoveAll(fs.Workdir)

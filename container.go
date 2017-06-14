@@ -12,10 +12,13 @@ type Container struct {
 	name string
 	fs   *filesystem
 
-	bootPreferred bool
-	active        bool
+	boot bool
 
-	cancel chan struct{}
+	booted   bool
+	chrooted bool
+
+	cancelBoot   chan struct{}
+	cancelChroot chan struct{}
 }
 
 // New creates a container descriptor, but it won't start the container immediately.
@@ -23,11 +26,10 @@ type Container struct {
 // You may want to call Command() after this.
 func New(name, baseDir string) *Container {
 	c := &Container{
-		name:          name,
-		fs:            new(filesystem),
-		bootPreferred: true,
-		active:        false,
-		cancel:        make(chan struct{}),
+		name:       name,
+		fs:         new(filesystem),
+		boot:       true,
+		cancelBoot: make(chan struct{}),
 	}
 	c.SetBaseDir(baseDir)
 	return c
@@ -50,26 +52,25 @@ func (c *Container) Command(cmdline string) int {
 // when they are not active. It can also choose boot-mode and chroot-mode automatically.
 // You may change this behaviour by SetPreference().
 func (c *Container) CommandRaw(proc string, args ...string) (exitCode int) {
-	if !c.fs.active {
+	if !c.IsFileSystemMounted() {
 		if err := c.Mount(); err != nil {
 			panic(err)
 		}
 	}
-	if c.bootPreferred && c.IsBootable() {
-		if !c.active {
-			c.systemdNspawnBoot()
-		}
-		exitCode = c.systemdRun(proc, args...)
+	c.lock.RLock()
+	booted := c.booted
+	boot := c.boot
+	c.lock.RUnlock()
+	if booted {
+		return c.systemdRun(proc, args...)
 	} else {
-		c.lock.Lock()
-		c.active = true
-		c.lock.Unlock()
-		exitCode = c.systemdNspawnRun(proc, args...)
-		c.lock.Lock()
-		c.active = false
-		c.lock.Unlock()
+		if boot && c.IsBootable() {
+			c.systemdNspawnBoot()
+			return c.systemdRun(proc, args...)
+		} else {
+			return c.systemdNspawnRun(proc, args...)
+		}
 	}
-	return
 }
 
 // Shutdown the container and unmount file system.
@@ -81,7 +82,7 @@ func (c *Container) Shutdown() error {
 func (c *Container) IsContainerActive() bool {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
-	return c.active
+	return c.booted || c.chrooted
 }
 
 // SetPreference changes the preference of container.
@@ -92,13 +93,13 @@ func (c *Container) IsContainerActive() bool {
 // even the file system is bootable.
 func (c *Container) SetPreference(boot bool) {
 	c.lock.Lock()
-	c.bootPreferred = boot
+	c.boot = boot
 	c.lock.Unlock()
 }
 
 // IsFileSystemActive returns whether the file system has been mounted or not.
-func (c *Container) IsFileSystemActive() bool {
-	return c.fs.IsActive()
+func (c *Container) IsFileSystemMounted() bool {
+	return c.fs.IsMounted()
 }
 
 // IsBootable returns whether the file system is bootable or not.

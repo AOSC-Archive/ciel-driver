@@ -27,24 +27,24 @@ func (c *Container) systemdNspawnBoot() {
 	go func() {
 		if err := cmd.Wait(); err != nil {
 			c.lock.Lock()
-			if c.active {
-				c.active = false
-				close(c.cancel)
-				c.cancel = make(chan struct{})
+			if c.booted {
+				c.booted = false
+				close(c.cancelBoot)
+				c.cancelBoot = make(chan struct{})
 			}
 			c.lock.Unlock()
 		}
 	}()
 	for !c.isSystemRunning() {
 		select {
-		case <-c.cancel:
+		case <-c.cancelBoot:
 			panic("container dead")
 		default:
 			time.Sleep(time.Millisecond * 100)
 		}
 	}
 	c.lock.Lock()
-	c.active = true
+	c.booted = true
 	c.lock.Unlock()
 }
 
@@ -59,34 +59,27 @@ func (c *Container) isSystemShutdown() bool {
 func (c *Container) machinectlPoweroff() error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	// Lock container, while it is stopping.
 
 	cmd := exec.Command("/usr/bin/machinectl", "poweroff", c.name)
 	b, err := cmd.CombinedOutput()
-	c.active = false
-	close(c.cancel)
-	c.cancel = make(chan struct{})
-	for !c.isSystemShutdown() {
-		select {
-		case <-c.cancel:
-			panic("container dead")
-		default:
-			time.Sleep(time.Millisecond * 100)
-		}
-	}
-
 	if err != nil {
 		return errors.New(string(b))
 	}
+	for !c.isSystemShutdown() {
+		time.Sleep(time.Millisecond * 100)
+	}
+	c.booted = false
+	close(c.cancelBoot)
+	c.cancelBoot = make(chan struct{})
 	return nil
 }
 
 func (c *Container) systemdRun(proc string, args ...string) int {
 	c.lock.RLock()
-	a := c.active
+	booted := c.booted
 	c.lock.RUnlock()
-	if !a {
-		return -1
+	if !booted {
+		panic("container is down")
 	}
 	subArgs := append([]string{proc}, args...)
 	subArgs = append([]string{
@@ -99,6 +92,10 @@ func (c *Container) systemdRun(proc string, args ...string) int {
 }
 
 func (c *Container) systemdNspawnRun(proc string, args ...string) int {
+	if c.IsContainerActive() {
+		panic("another chroot-mode instance is running")
+	}
+
 	subArgs := append([]string{proc}, args...)
 	c.fs.lock.RLock()
 	subArgs = append([]string{
@@ -107,7 +104,16 @@ func (c *Container) systemdNspawnRun(proc string, args ...string) int {
 		"-D", c.fs.target,
 	}, subArgs...)
 	c.fs.lock.RUnlock()
-	return cmd("/usr/bin/systemd-nspawn", subArgs...)
+
+	c.lock.Lock()
+	c.chrooted = true
+	c.lock.Unlock()
+	exitCode := cmd("/usr/bin/systemd-nspawn", subArgs...)
+	c.lock.Lock()
+	c.chrooted = false
+	c.lock.Unlock()
+
+	return exitCode
 }
 
 func cmd(proc string, args ...string) int {
