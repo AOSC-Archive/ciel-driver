@@ -1,6 +1,7 @@
 package ciel
 
 import (
+	"context"
 	"sync"
 )
 
@@ -44,7 +45,7 @@ func New(name, baseDir string) *Container {
 //
 // NOTE: It calls CommandRaw() internally.
 func (c *Container) Command(cmdline string) int {
-	return c.CommandRaw(_SHELLPATH, "-l", "-c", cmdline)
+	return c.CommandContext(context.Background(), cmdline)
 }
 
 // CommandRaw runs command in container.
@@ -53,6 +54,16 @@ func (c *Container) Command(cmdline string) int {
 // when they are not active. It can also choose boot-mode and chroot-mode automatically.
 // You may change this behaviour by SetPreference().
 func (c *Container) CommandRaw(proc string, args ...string) (exitCode int) {
+	return c.CommandRawContext(context.Background(), proc, args...)
+}
+
+// CommandContext is Command() with context.
+func (c *Container) CommandContext(ctx context.Context, cmdline string) int {
+	return c.CommandRawContext(ctx, _SHELLPATH, "-l", "-c", cmdline)
+}
+
+// CommandRawContext is CommandRaw() with context.
+func (c *Container) CommandRawContext(ctx context.Context, proc string, args ...string) (exitCode int) {
 	if !c.IsFileSystemMounted() {
 		if err := c.Mount(); err != nil {
 			panic(err)
@@ -63,13 +74,13 @@ func (c *Container) CommandRaw(proc string, args ...string) (exitCode int) {
 	boot := c.boot
 	c.lock.RUnlock()
 	if booted {
-		return c.systemdRun(proc, args...)
+		return c.systemdRun(ctx, proc, args...)
 	} else {
 		if boot && c.IsBootable() {
 			c.systemdNspawnBoot()
-			return c.systemdRun(proc, args...)
+			return c.systemdRun(ctx, proc, args...)
 		} else {
-			return c.systemdNspawnRun(proc, args...)
+			return c.systemdNspawnRun(ctx, proc, args...)
 		}
 	}
 }

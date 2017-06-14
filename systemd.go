@@ -1,6 +1,7 @@
 package ciel
 
 import (
+	"context"
 	"errors"
 	"os"
 	"os/exec"
@@ -83,7 +84,7 @@ func (c *Container) machinectlShutdown() error {
 	return nil
 }
 
-func (c *Container) systemdRun(proc string, args ...string) int {
+func (c *Container) systemdRun(ctx context.Context, proc string, args ...string) int {
 	c.lock.RLock()
 	booted := c.booted
 	c.lock.RUnlock()
@@ -97,10 +98,10 @@ func (c *Container) systemdRun(proc string, args ...string) int {
 		"--pty",
 		"-M", c.name,
 	}, subArgs...)
-	return cmd("/usr/bin/systemd-run", subArgs...)
+	return cmd(ctx, "/usr/bin/systemd-run", subArgs...)
 }
 
-func (c *Container) systemdNspawnRun(proc string, args ...string) int {
+func (c *Container) systemdNspawnRun(ctx context.Context, proc string, args ...string) int {
 	if c.IsContainerActive() {
 		panic("another chroot-mode instance is running")
 	}
@@ -117,16 +118,16 @@ func (c *Container) systemdNspawnRun(proc string, args ...string) int {
 	c.lock.Lock()
 	c.chrooted = true
 	c.lock.Unlock()
-	exitCode := cmd("/usr/bin/systemd-nspawn", subArgs...)
-	c.lock.Lock()
-	c.chrooted = false
-	c.lock.Unlock()
-
-	return exitCode
+	defer func() {
+		c.lock.Lock()
+		c.chrooted = false
+		c.lock.Unlock()
+	}()
+	return cmd(ctx, "/usr/bin/systemd-nspawn", subArgs...)
 }
 
-func cmd(proc string, args ...string) int {
-	cmd := exec.Command(proc, args...)
+func cmd(ctx context.Context, proc string, args ...string) int {
+	cmd := exec.CommandContext(ctx, proc, args...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
