@@ -15,13 +15,12 @@ type Container struct {
 	name       string
 	fs         *Filesystem
 	properties []string
+
 	boot       bool
+	booted     bool
+	cancelBoot chan struct{}
 
-	booted   bool
 	chrooted bool
-
-	cancelBoot   chan struct{}
-	cancelChroot chan struct{}
 }
 
 // New creates a container descriptor, but it won't start the container immediately.
