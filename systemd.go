@@ -68,6 +68,8 @@ func (c *Container) machinectlShutdown() error {
 		cmd = exec.Command("/usr/bin/machinectl", "poweroff", c.name)
 	} else if c.chrooted {
 		cmd = exec.Command("/usr/bin/machinectl", "terminate", c.name)
+	} else {
+		return nil
 	}
 
 	b, err := cmd.CombinedOutput()
