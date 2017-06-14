@@ -13,7 +13,7 @@ type Container struct {
 	lock sync.RWMutex
 
 	name       string
-	fs         *filesystem
+	fs         *Filesystem
 	properties []string
 	boot       bool
 
@@ -30,7 +30,7 @@ type Container struct {
 func New(name, baseDir string) *Container {
 	c := &Container{
 		name:       name,
-		fs:         new(filesystem),
+		fs:         new(Filesystem),
 		properties: []string{},
 		boot:       true,
 		cancelBoot: make(chan struct{}),
@@ -141,28 +141,36 @@ func (c *Container) SetProperty(property string) {
 
 // IsFileSystemActive returns whether the file system has been mounted or not.
 func (c *Container) IsFileSystemMounted() bool {
-	return c.fs.IsMounted()
+	return c.fs.isMounted()
 }
 
 // IsBootable returns whether the file system is bootable or not.
 //
 // NOTE: The basis of determining is the file /usr/lib/systemd/systemd.
 func (c *Container) IsBootable() bool {
-	return c.fs.IsBootable()
+	return c.fs.isBootable()
 }
 
 // SetBaseDir sets the base directory for components of the container.
 func (c *Container) SetBaseDir(path string) {
-	c.fs.SetBaseDir(path)
+	c.fs.setBaseDir(path)
 }
 
 // Mount the file system to a temporary directory.
 // It will be called automatically by CommandRaw().
 func (c *Container) Mount() error {
-	return c.fs.Mount()
+	return c.fs.mount()
 }
 
 // Unmount the file system, and cleans the temporary directories.
 func (c *Container) Unmount() error {
-	return c.fs.Unmount()
+	return c.fs.unmount()
+}
+
+// Filesystem returns a Filesystem structure copy of the internal one.
+// So modify it won't take any effect in the container.
+func (c *Container) Filesystem() Filesystem {
+	var fs Filesystem
+	fs = *c.fs
+	return fs
 }

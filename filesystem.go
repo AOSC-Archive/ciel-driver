@@ -10,7 +10,7 @@ import (
 	"syscall"
 )
 
-type filesystem struct {
+type Filesystem struct {
 	lock sync.RWMutex
 
 	Workdir    string `role:"work"  dir:"99-workdir"`
@@ -21,37 +21,37 @@ type filesystem struct {
 	Stub       string `role:"lower" dir:"00-stub"`
 
 	base    string
-	target  string
+	Target  string
 	mounted bool
 }
 
 const _SYSTEMDPATH = "/usr/lib/systemd/systemd"
 
-func (fs *filesystem) IsBootable() bool {
+func (fs *Filesystem) isBootable() bool {
 	fs.lock.RLock()
 	defer fs.lock.RUnlock()
 
 	if !fs.mounted {
 		return false
 	}
-	if _, err := os.Stat(fs.target + _SYSTEMDPATH); os.IsNotExist(err) {
+	if _, err := os.Stat(fs.Target + _SYSTEMDPATH); os.IsNotExist(err) {
 		return false
 	}
 	return true
 }
 
-func (fs *filesystem) IsMounted() bool {
+func (fs *Filesystem) isMounted() bool {
 	fs.lock.RLock()
 	defer fs.lock.RUnlock()
 	return fs.mounted
 }
 
-func (fs *filesystem) SetBaseDir(path string) {
+func (fs *Filesystem) setBaseDir(path string) {
 	fs.lock.Lock()
 	defer fs.lock.Unlock()
 
 	if fs.mounted {
-		panic("setBaseDir when filesystem has been mounted")
+		panic("setBaseDir when file system has been mounted")
 	}
 
 	fs.base = path
@@ -71,7 +71,7 @@ func (fs *filesystem) SetBaseDir(path string) {
 	}
 }
 
-func (fs *filesystem) Mount() error {
+func (fs *Filesystem) mount() error {
 	fs.lock.Lock()
 	defer fs.lock.Unlock()
 
@@ -85,30 +85,30 @@ func (fs *filesystem) Mount() error {
 			lowerdirs = append(lowerdirs, v.Field(i).String())
 		}
 	}
-	fs.target = "/tmp/ciel." + randomFilename()
-	os.Mkdir(fs.target, 0775)
+	fs.Target = "/tmp/ciel." + randomFilename()
+	os.Mkdir(fs.Target, 0775)
 	os.Mkdir(fs.Workdir, 0775)
-	reterr := mount(fs.target, fs.Upperdir, fs.Workdir, lowerdirs...)
+	reterr := mount(fs.Target, fs.Upperdir, fs.Workdir, lowerdirs...)
 	if reterr == nil {
 		fs.mounted = true
 	}
 	return reterr
 }
 
-func (fs *filesystem) Unmount() error {
+func (fs *Filesystem) unmount() error {
 	fs.lock.Lock()
 	defer fs.lock.Unlock()
 	if !fs.mounted {
 		return nil
 	}
 
-	if err := unmount(fs.target); err != nil {
+	if err := unmount(fs.Target); err != nil {
 		return err
 	}
 	defer func() {
 		fs.mounted = false
 	}()
-	err1 := os.Remove(fs.target)
+	err1 := os.Remove(fs.Target)
 	err2 := os.RemoveAll(fs.Workdir)
 	if err2 != nil {
 		return err2
