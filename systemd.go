@@ -10,18 +10,18 @@ import (
 )
 
 func (c *Container) systemdNspawnBoot() {
-	c.fs.lock.RLock()
+	c.Fs.lock.RLock()
 	args := []string{
 		"--quiet",
 		"--boot",
-		"-M", c.name,
-		"-D", c.fs.Target,
+		"-M", c.Name,
+		"-D", c.Fs.Target,
 	}
 	for _, p := range c.properties {
 		args = append(args, "--property="+p)
 	}
 	cmd := exec.Command("/usr/bin/systemd-nspawn", args...)
-	c.fs.lock.RUnlock()
+	c.Fs.lock.RUnlock()
 	if err := cmd.Start(); err != nil {
 		panic(err)
 	}
@@ -52,11 +52,11 @@ func (c *Container) systemdNspawnBoot() {
 }
 
 func (c *Container) isSystemRunning() bool {
-	return exec.Command("/usr/bin/systemctl", "is-system-running", "-M", c.name).Run() == nil
+	return exec.Command("/usr/bin/systemctl", "is-system-running", "-M", c.Name).Run() == nil
 }
 
 func (c *Container) isSystemShutdown() bool {
-	return exec.Command("/usr/bin/machinectl", "status", c.name).Run() != nil
+	return exec.Command("/usr/bin/machinectl", "status", c.Name).Run() != nil
 }
 
 func (c *Container) machinectlShutdown() error {
@@ -65,9 +65,9 @@ func (c *Container) machinectlShutdown() error {
 
 	var cmd *exec.Cmd
 	if c.booted {
-		cmd = exec.Command("/usr/bin/machinectl", "poweroff", c.name)
+		cmd = exec.Command("/usr/bin/machinectl", "poweroff", c.Name)
 	} else if c.chrooted {
-		cmd = exec.Command("/usr/bin/machinectl", "terminate", c.name)
+		cmd = exec.Command("/usr/bin/machinectl", "terminate", c.Name)
 	} else {
 		return nil
 	}
@@ -98,7 +98,7 @@ func (c *Container) systemdRun(ctx context.Context, proc string, stdin io.Reader
 		"--quiet",
 		"--wait",
 		"--pty",
-		"-M", c.name,
+		"-M", c.Name,
 	}, subArgs...)
 	return cmd(ctx, "/usr/bin/systemd-run", stdin, stdout, stderr, subArgs...)
 }
@@ -109,13 +109,13 @@ func (c *Container) systemdNspawnRun(ctx context.Context, proc string, stdin io.
 	}
 
 	subArgs := append([]string{proc}, args...)
-	c.fs.lock.RLock()
+	c.Fs.lock.RLock()
 	subArgs = append([]string{
 		"--quiet",
-		"-M", c.name,
-		"-D", c.fs.Target,
+		"-M", c.Name,
+		"-D", c.Fs.Target,
 	}, subArgs...)
-	c.fs.lock.RUnlock()
+	c.Fs.lock.RUnlock()
 
 	c.lock.Lock()
 	c.chrooted = true

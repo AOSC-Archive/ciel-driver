@@ -12,8 +12,8 @@ const SHELLPATH = "/bin/bash"
 type Container struct {
 	lock sync.RWMutex
 
-	name       string
-	fs         *FileSystem
+	Name       string
+	Fs         *FileSystem
 	properties []string
 
 	boot       bool
@@ -28,13 +28,13 @@ type Container struct {
 // You may want to call Command() after this.
 func New(name, baseDir string) *Container {
 	c := &Container{
-		name:       name,
-		fs:         new(FileSystem),
+		Name:       name,
+		Fs:         new(FileSystem),
 		properties: []string{},
 		boot:       true,
 		cancelBoot: make(chan struct{}),
 	}
-	c.fs.setBaseDir(baseDir)
+	c.Fs.setBaseDir(baseDir)
 	return c
 }
 
@@ -140,31 +140,31 @@ func (c *Container) SetProperty(property string) {
 
 // IsFileSystemActive returns whether the file system has been mounted or not.
 func (c *Container) IsMounted() bool {
-	return c.fs.isMounted()
+	return c.Fs.isMounted()
 }
 
 // IsBootable returns whether the file system is bootable or not.
 //
 // NOTE: The basis of determining is the file /usr/lib/systemd/systemd.
 func (c *Container) IsBootable() bool {
-	return c.fs.isBootable()
+	return c.Fs.isBootable()
 }
 
 // Mount the file system to a temporary directory.
 // It will be called automatically by CommandRaw().
 func (c *Container) Mount() error {
-	return c.fs.mount()
+	return c.Fs.mount()
 }
 
 // Unmount the file system, and cleans the temporary directories.
 func (c *Container) Unmount() error {
-	return c.fs.unmount()
+	return c.Fs.unmount()
 }
 
 // FileSystem returns a FileSystem structure copy of the internal one.
 // So modify it won't take any effect in the container.
 func (c *Container) FileSystem() FileSystem {
 	var fs FileSystem
-	fs = *c.fs
+	fs = *c.Fs
 	return fs
 }
