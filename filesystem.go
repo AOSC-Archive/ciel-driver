@@ -74,6 +74,9 @@ func (fs *FileSystem) setBaseDir(path string) {
 func (fs *FileSystem) mount() error {
 	fs.lock.Lock()
 	defer fs.lock.Unlock()
+	if fs.mounted {
+		return nil
+	}
 
 	lowerdirs := []string{}
 	t := reflect.TypeOf(*fs)
