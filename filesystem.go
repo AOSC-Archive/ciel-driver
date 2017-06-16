@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"sync"
@@ -13,12 +14,17 @@ import (
 type FileSystem struct {
 	lock sync.RWMutex
 
-	WorkDir    string `role:"work"  dir:"99-workdir"`
-	UpperDir   string `role:"upper" dir:"99-upperdir"`
-	Cache      string `role:"lower" dir:"50-cache"`
-	Buildkit   string `role:"lower" dir:"10-buildkit"`
-	StubConfig string `role:"lower" dir:"01-stub-config"`
-	Stub       string `role:"lower" dir:"00-stub"`
+	WorkDir  string `role:"work"  dir:"99-workdir"`
+	UpperDir string `role:"upper" dir:"99-upperdir"`
+
+	Cache          string `role:"lower" dir:"50-cache"`
+	MaskCache      bool
+	BuildKit       string `role:"lower" dir:"10-buildkit"`
+	MaskBuildKit   bool
+	StubConfig     string `role:"lower" dir:"01-stub-config"`
+	MaskStubConfig bool
+	Stub           string `role:"lower" dir:"00-stub"`
+	MaskStub       bool
 
 	base    string
 	Target  string
@@ -59,14 +65,10 @@ func (fs *FileSystem) setBaseDir(path string) {
 	v := reflect.ValueOf(fs).Elem()
 	n := t.NumField()
 	for i := 0; i < n; i++ {
-		role := t.Field(i).Tag.Get("role")
 		dir := t.Field(i).Tag.Get("dir")
 		if dir != "" {
-			fulldir := fs.base + "/" + dir
+			fulldir := filepath.Join(fs.base, dir)
 			v.Field(i).SetString(fulldir)
-			if role != "work" {
-				os.Mkdir(fulldir, 0775)
-			}
 		}
 	}
 }
@@ -84,8 +86,19 @@ func (fs *FileSystem) mount() error {
 	n := t.NumField()
 	for i := 0; i < n; i++ {
 		role := t.Field(i).Tag.Get("role")
+		if role == "" {
+			continue
+		}
+		if role != "work" {
+			os.Mkdir(v.Field(i).String(), 0775)
+		}
 		if role == "lower" {
-			lowerdirs = append(lowerdirs, v.Field(i).String())
+			if v.FieldByName("Mask" + t.Field(i).Name).Bool() {
+				continue
+			}
+			if dirname := v.Field(i).String(); dirname != "" {
+				lowerdirs = append(lowerdirs, dirname)
+			}
 		}
 	}
 	fs.Target = "/tmp/ciel." + randomFilename()
