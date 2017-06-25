@@ -29,12 +29,16 @@ type Container struct {
 func New(name, baseDir string) *Container {
 	c := &Container{
 		Name:       name,
-		Fs:         new(FileSystem),
 		properties: []string{},
 		boot:       true,
 		cancelBoot: make(chan struct{}),
 	}
-	c.Fs.setBaseDir(baseDir)
+	c.Fs = newFileSystem(baseDir, "99-upperdir", LowerLayers{
+		"50-cache",
+		"10-buildkit",
+		"01-stub-config",
+		"00-stub",
+	})
 	return c
 }
 
@@ -67,8 +71,8 @@ func (c *Container) CommandContext(ctx context.Context, cmdline string) int {
 
 // CommandRawContext is CommandRaw() with context.
 func (c *Container) CommandRawContext(ctx context.Context, proc string, stdin io.Reader, stdout, stderr io.Writer, args ...string) int {
-	if !c.IsMounted() {
-		if err := c.Mount(); err != nil {
+	if !c.Fs.IsMounted() {
+		if err := c.Fs.Mount(); err != nil {
 			panic(err)
 		}
 	}
@@ -79,7 +83,7 @@ func (c *Container) CommandRawContext(ctx context.Context, proc string, stdin io
 	if booted {
 		return c.systemdRun(ctx, proc, stdin, stdout, stderr, args...)
 	} else {
-		if boot && c.IsBootable() {
+		if boot && c.Fs.IsBootable() {
 			c.systemdNspawnBoot()
 			return c.systemdRun(ctx, proc, stdin, stdout, stderr, args...)
 		} else {
@@ -136,35 +140,4 @@ func (c *Container) SetProperty(property string) {
 	c.lock.Lock()
 	c.properties = append(c.properties, property)
 	c.lock.Unlock()
-}
-
-// IsFileSystemActive returns whether the file system has been mounted or not.
-func (c *Container) IsMounted() bool {
-	return c.Fs.isMounted()
-}
-
-// IsBootable returns whether the file system is bootable or not.
-//
-// NOTE: The basis of determining is the file /usr/lib/systemd/systemd.
-func (c *Container) IsBootable() bool {
-	return c.Fs.isBootable()
-}
-
-// Mount the file system to a temporary directory.
-// It will be called automatically by CommandRaw().
-func (c *Container) Mount() error {
-	return c.Fs.mount()
-}
-
-// Unmount the file system, and cleans the temporary directories.
-func (c *Container) Unmount() error {
-	return c.Fs.unmount()
-}
-
-// FileSystem returns a FileSystem structure copy of the internal one.
-// So modify it won't take any effect in the container.
-func (c *Container) FileSystem() FileSystem {
-	var fs FileSystem
-	fs = *c.Fs
-	return fs
 }
