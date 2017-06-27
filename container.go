@@ -33,7 +33,8 @@ func New(name, baseDir string) *Container {
 		boot:       true,
 		cancelBoot: make(chan struct{}),
 	}
-	c.Fs = newFileSystem(baseDir, "99-upperdir", LowerLayers{
+	c.Fs = newFileSystem(baseDir, Layers{
+		"99-upperdir",
 		"50-cache",
 		"10-buildkit",
 		"01-stub-config",

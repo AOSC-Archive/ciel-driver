@@ -10,13 +10,13 @@ import (
 	"syscall"
 )
 
-type LowerLayers []string
+type Layers []string
 
-func (ll LowerLayers) Path(name string) string {
+func (ll Layers) Path(name string) string {
 	return ll[ll.Index(name)]
 }
 
-func (ll LowerLayers) Index(name string) int {
+func (ll Layers) Index(name string) int {
 	for pos, fullname := range ll {
 		fullnameSlice := strings.SplitN(fullname, "-", 2)
 		if name == fullnameSlice[1] {
@@ -29,9 +29,8 @@ func (ll LowerLayers) Index(name string) int {
 type FileSystem struct {
 	lock sync.RWMutex
 
-	upperDir      string
-	lowerDirs     LowerLayers
-	lowerDirsMask []bool
+	layers     Layers
+	layersMask []bool
 
 	base   string
 	target string
@@ -42,33 +41,33 @@ type FileSystem struct {
 const SystemdPath = "/usr/lib/systemd/systemd"
 const WorkDirSuffix = ".work"
 
-func (fs *FileSystem) UpperDir() string {
-	return filepath.Join(fs.base, fs.upperDir)
+func (fs *FileSystem) TopLayer() string {
+	return filepath.Join(fs.base, fs.layers[0])
 }
 func (fs *FileSystem) WorkDir() string {
-	return filepath.Join(fs.base, fs.upperDir+WorkDirSuffix)
+	return filepath.Join(fs.base, fs.layers[0]+WorkDirSuffix)
 }
-func (fs *FileSystem) LowerDir(name string) string {
-	return filepath.Join(fs.base, fs.lowerDirs.Path(name))
+func (fs *FileSystem) Layer(name string) string {
+	return filepath.Join(fs.base, fs.layers.Path(name))
 }
 func (fs *FileSystem) DisableAll() {
-	for i := range fs.lowerDirsMask {
-		fs.lowerDirsMask[i] = false
+	for i := range fs.layersMask {
+		fs.layersMask[i] = false
 	}
 }
 func (fs *FileSystem) EnableAll() {
-	for i := range fs.lowerDirsMask {
-		fs.lowerDirsMask[i] = true
+	for i := range fs.layersMask {
+		fs.layersMask[i] = true
 	}
 }
 func (fs *FileSystem) Disable(names ...string) {
 	for _, name := range names {
-		fs.lowerDirsMask[fs.lowerDirs.Index(name)] = false
+		fs.layersMask[fs.layers.Index(name)] = false
 	}
 }
 func (fs *FileSystem) Enable(names ...string) {
 	for _, name := range names {
-		fs.lowerDirsMask[fs.lowerDirs.Index(name)] = true
+		fs.layersMask[fs.layers.Index(name)] = true
 	}
 }
 func (fs *FileSystem) Target() string {
@@ -107,11 +106,11 @@ func (fs *FileSystem) Mount() error {
 		return nil
 	}
 
-	os.Mkdir(fs.UpperDir(), 0755)
+	os.Mkdir(fs.TopLayer(), 0755)
 	lowersToMount := []string{}
-	for i := range fs.lowerDirs {
-		if fs.lowerDirsMask[i] {
-			dirname := filepath.Join(fs.base, fs.lowerDirs[i])
+	for i := range fs.layers {
+		if i != 0 && fs.layersMask[i] {
+			dirname := filepath.Join(fs.base, fs.layers[i])
 			os.Mkdir(dirname, 0755)
 			lowersToMount = append(lowersToMount, dirname)
 		}
@@ -119,8 +118,8 @@ func (fs *FileSystem) Mount() error {
 
 	fs.target = "/tmp/ciel." + randomFilename()
 	os.Mkdir(fs.Target(), 0755)
-	os.Mkdir(fs.UpperDir()+WorkDirSuffix, 0755)
-	reterr := fsMount(fs.Target(), fs.UpperDir(), fs.UpperDir()+WorkDirSuffix, lowersToMount)
+	os.Mkdir(fs.WorkDir(), 0755)
+	reterr := fsMount(fs.Target(), fs.TopLayer(), fs.WorkDir(), lowersToMount)
 	if reterr == nil {
 		fs.mounted = true
 	}
@@ -142,7 +141,7 @@ func (fs *FileSystem) Unmount() error {
 		fs.mounted = false
 	}()
 	err1 := os.Remove(fs.Target())
-	err2 := os.RemoveAll(fs.UpperDir() + WorkDirSuffix)
+	err2 := os.RemoveAll(fs.WorkDir())
 	if err2 != nil {
 		return err2
 	}
@@ -152,12 +151,11 @@ func (fs *FileSystem) Unmount() error {
 	return nil
 }
 
-func newFileSystem(base string, upper string, lowers LowerLayers) *FileSystem {
+func newFileSystem(base string, layers Layers) *FileSystem {
 	fs := new(FileSystem)
 	fs.base = base
-	fs.upperDir = upper
-	fs.lowerDirs = lowers
-	fs.lowerDirsMask = make([]bool, len(lowers))
+	fs.layers = layers
+	fs.layersMask = make([]bool, len(fs.layers))
 	fs.EnableAll()
 	return fs
 }
