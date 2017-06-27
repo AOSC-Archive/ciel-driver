@@ -7,13 +7,10 @@ import (
 	"syscall"
 )
 
-func (fs *FileSystem) Merge(path, upperx, lowerx string, includeSelf bool) error {
-	panic("not implemented")
-	// FIXME: wip
-
+func (fs *FileSystem) Merge(path, upper, lower string, includeSelf bool) error {
 	errResetWalk := errors.New("reset walk")
-	uroot, lroot := fs.Layer(upperx), fs.Layer(lowerx)
-	isBottom := fs.layers.Index(lowerx) == len(fs.layers)-1
+	uroot, lroot := fs.Layer(upper), fs.Layer(lower)
+	lindex, maxindex := fs.layers.Index(lower), len(fs.layers)-1
 	walkBase := filepath.Join(uroot, path)
 	var err error
 	for err == errResetWalk {
@@ -35,6 +32,7 @@ func (fs *FileSystem) Merge(path, upperx, lowerx string, includeSelf bool) error
 
 			switch utp {
 			case overlayTypeDir:
+
 				switch ltp {
 				case overlayTypeAir:
 					// the lower layer had no effect on this position.
@@ -42,32 +40,96 @@ func (fs *FileSystem) Merge(path, upperx, lowerx string, includeSelf bool) error
 						return err
 					}
 					return errResetWalk // sub-file list has been affected, reset this process.
+
 				case overlayTypeDir:
 					// copy attributes, and continue.
 					return copyAttributes(upath, lpath)
+
 				default:
-					// whiteout or normal file, which can be a cover,
+					// the upper layer is a directory,
+					// the lower layer is a whiteout or a normal file, which can be a cover,
 					// that removing them may let the content in lower layers appear.
 
-					// "open" the directory
+					var nextfileindex = 0
+					var havedir = false
+					// if the lower layer is the bottom
+					// or lower layers under the lower layer have another cover.
+					if lindex != maxindex {
+					FindFileLoop:
+						for i := lindex + 1; i <= maxindex; i++ {
+							iroot := filepath.Join(fs.base, fs.layers[i])
+							ipath := filepath.Join(iroot, rel)
+							itp, _ := overlayTypeByLstat(ipath)
+							switch itp {
+							case overlayTypeFile, overlayTypeWhiteout:
+								nextfileindex = i
+								break FindFileLoop
+							case overlayTypeDir:
+								havedir = true
+							}
+						}
+					}
+					// we can merge the upper one safely.
+					if !havedir {
+						os.Remove(lpath)
+						if err := os.Rename(upath, lpath); err != nil {
+							return err
+						}
+						return errResetWalk
+					}
+
+					// 1). "open" the directory
 					os.Mkdir(lpath, 0000)
 					if err := copyAttributes(upath, lpath); err != nil {
 						return err
 					}
-					// "cover" all sub-files in the directory
+					// 2). "cover" all sub-files in the directory
+					filelist := make(map[string]bool)
+					for i := nextfileindex - 1; i > lindex; i-- {
+						iroot := filepath.Join(fs.base, fs.layers[i])
+						ipath := filepath.Join(iroot, rel)
+						iinfo, err := os.Lstat(ipath)
+						if os.IsNotExist(err) {
+							continue
+						}
+						idir, err := os.Open(ipath)
+						if err != nil {
+							continue
+						}
+						iinfos, err := idir.Readdir(0) // check all sub-files
+						if err != nil {
+							continue
+						}
+						for _, iiinfo := range iinfos {
+							iitp, _ := overlayTypeByInfo(iiinfo, nil)
+							if iitp == overlayTypeWhiteout {
+								delete(filelist, iinfo.Name())
+							} else {
+								filelist[iinfo.Name()] = true
+							}
+						}
+						idir.Close()
+					}
+					for filename := range filelist {
+						createWhiteout(filepath.Join(lpath, filename))
+					}
+					return nil
+				}
 
-					return nil
-				}
 			default:
-				// whiteout or normal file, which acts as a cover.
+				// the upper layer is a whiteout or a normal file, which acts as a cover.
 				os.RemoveAll(lpath)
-				if isBottom && utp == overlayTypeWhiteout {
-					return nil
+				err := os.Rename(upath, lpath)
+
+				// a whiteout applied to the bottom?
+				if lindex == maxindex && utp == overlayTypeWhiteout {
+					os.Remove(lpath)
 				}
-				return os.Rename(upath, lpath)
+
+				return err
 			}
 
-			return nil
+			// end of walk-function
 		})
 	}
 	return err
@@ -85,7 +147,7 @@ const (
 )
 
 func copyAttributes(src, dst string) error {
-	// TODO: copyAttributes
+	// TODO: copyAttributes: mode, uid, gid, context, attr, ...
 	return nil
 }
 
