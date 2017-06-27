@@ -7,7 +7,7 @@ import (
 	"syscall"
 )
 
-// Merge is the method to merge a file or directory from an upper layer
+// MergeFile is the method to merge a file or directory from an upper layer
 // to a lower layer.
 func (fs *FileSystem) MergeFile(path, upper, lower string, excludeSelf bool) error {
 	errResetWalk := errors.New("reset walk")
