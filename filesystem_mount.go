@@ -6,73 +6,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"syscall"
 )
 
-type Layers []string
-
-func (ll Layers) Path(name string) string {
-	return ll[ll.Index(name)]
-}
-
-func (ll Layers) Index(name string) int {
-	for pos, fullname := range ll {
-		fullnameSlice := strings.SplitN(fullname, "-", 2)
-		if name == fullnameSlice[1] {
-			return pos
-		}
-	}
-	panic("no such lowerdir")
-}
-
-type FileSystem struct {
-	lock sync.RWMutex
-
-	layers     Layers
-	layersMask []bool
-
-	base   string
-	target string
-
-	mounted bool
-}
-
+// SystemdPath is the path of systemd's excutable binary file in container.
+// We use it to determine if the container has installed Systemd.
 const SystemdPath = "/usr/lib/systemd/systemd"
-const WorkDirSuffix = ".work"
-
-func (fs *FileSystem) TopLayer() string {
-	return filepath.Join(fs.base, fs.layers[0])
-}
-func (fs *FileSystem) TopLayerWorkDir() string {
-	return filepath.Join(fs.base, fs.layers[0]+WorkDirSuffix)
-}
-func (fs *FileSystem) Layer(name string) string {
-	return filepath.Join(fs.base, fs.layers.Path(name))
-}
-func (fs *FileSystem) DisableAll() {
-	for i := range fs.layersMask {
-		fs.layersMask[i] = false
-	}
-}
-func (fs *FileSystem) EnableAll() {
-	for i := range fs.layersMask {
-		fs.layersMask[i] = true
-	}
-}
-func (fs *FileSystem) DisableLayer(names ...string) {
-	for _, name := range names {
-		fs.layersMask[fs.layers.Index(name)] = false
-	}
-}
-func (fs *FileSystem) EnableLayer(names ...string) {
-	for _, name := range names {
-		fs.layersMask[fs.layers.Index(name)] = true
-	}
-}
-func (fs *FileSystem) TargetDir() string {
-	return fs.target
-}
 
 // IsBootable returns whether the file system is bootable or not.
 //
@@ -149,15 +88,6 @@ func (fs *FileSystem) Unmount() error {
 		return err1
 	}
 	return nil
-}
-
-func newFileSystem(base string, layers Layers) *FileSystem {
-	fs := new(FileSystem)
-	fs.base = base
-	fs.layers = layers
-	fs.layersMask = make([]bool, len(fs.layers))
-	fs.EnableAll()
-	return fs
 }
 
 func randomFilename() string {

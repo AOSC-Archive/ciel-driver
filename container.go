@@ -7,8 +7,12 @@ import (
 	"sync"
 )
 
-const SHELLPATH = "/bin/bash"
+// ShellPath is the path of shell in container.
+const ShellPath = "/bin/bash"
 
+// Container represents an instance of your container.
+//
+// FIXME: It's not coroutine-safe so far.
 type Container struct {
 	lock sync.RWMutex
 
@@ -43,7 +47,7 @@ func New(name, baseDir string) *Container {
 	return c
 }
 
-// Command calls the command line with shell ("SHELLPATH -l -c <cmdline>") in container,
+// Command calls the command line with shell ("ShellPath -l -c <cmdline>") in container,
 // returns the exit code.
 //
 // Don't worry about mounting file system, starting container and the mode of booting.
@@ -67,7 +71,7 @@ func (c *Container) CommandRaw(proc string, stdin io.Reader, stdout, stderr io.W
 
 // CommandContext is Command() with context.
 func (c *Container) CommandContext(ctx context.Context, cmdline string) int {
-	return c.CommandRawContext(ctx, SHELLPATH, os.Stdin, os.Stdout, os.Stderr, "-l", "-c", cmdline)
+	return c.CommandRawContext(ctx, ShellPath, os.Stdin, os.Stdout, os.Stderr, "-l", "-c", cmdline)
 }
 
 // CommandRawContext is CommandRaw() with context.
