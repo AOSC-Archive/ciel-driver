@@ -14,7 +14,7 @@ func (fs *FileSystem) MergeFile(path, upper, lower string, excludeSelf bool) err
 	uroot, lroot := fs.Layer(upper), fs.Layer(lower)
 	lindex, maxindex := fs.layers.Index(lower), len(fs.layers)-1
 	walkBase := filepath.Join(uroot, path)
-	var err error
+	var err = errResetWalk
 	for err == errResetWalk {
 		err = filepath.Walk(walkBase, func(upath string, info os.FileInfo, err error) error {
 			if excludeSelf && upath == walkBase {
