@@ -52,7 +52,7 @@ func (fs *FileSystem) MergeFile(path, upper, lower string, excludeSelf bool) err
 					// the lower layer is a whiteout or a normal file, which can be a cover,
 					// that removing them may let the content in lower layers appear.
 
-					// if the lower layer is the bottom
+					// if the lower layer is at the bottom
 					// or lower layers under the lower layer have another cover,
 					// we can merge the upper one safely.
 					nextfilelayer, havedir := fs.nextLayerHasFile(rel, lindex)
