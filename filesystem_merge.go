@@ -7,7 +7,9 @@ import (
 	"syscall"
 )
 
-func (fs *FileSystem) Merge(path, upper, lower string, includeSelf bool) error {
+// Merge is the method to merge a file or directory from an upper layer
+// to a lower layer.
+func (fs *FileSystem) Merge(path, upper, lower string, excludeSelf bool) error {
 	errResetWalk := errors.New("reset walk")
 	uroot, lroot := fs.Layer(upper), fs.Layer(lower)
 	lindex, maxindex := fs.layers.Index(lower), len(fs.layers)-1
@@ -15,7 +17,7 @@ func (fs *FileSystem) Merge(path, upper, lower string, includeSelf bool) error {
 	var err error
 	for err == errResetWalk {
 		err = filepath.Walk(walkBase, func(upath string, info os.FileInfo, err error) error {
-			if !includeSelf && upath == walkBase {
+			if excludeSelf && upath == walkBase {
 				return nil
 			}
 			rel, _ := filepath.Rel(uroot, upath)
