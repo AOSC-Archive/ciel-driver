@@ -83,14 +83,12 @@ func (c *Container) CommandRawContext(ctx context.Context, proc string, stdin io
 	c.lock.RUnlock()
 	if booted {
 		return c.systemdRun(ctx, proc, stdin, stdout, stderr, args...)
-	} else {
-		if boot && c.Fs.IsBootable() {
-			c.systemdNspawnBoot()
-			return c.systemdRun(ctx, proc, stdin, stdout, stderr, args...)
-		} else {
-			return c.systemdNspawnRun(ctx, proc, stdin, stdout, stderr, args...)
-		}
 	}
+	if boot && c.Fs.IsBootable() {
+		c.systemdNspawnBoot()
+		return c.systemdRun(ctx, proc, stdin, stdout, stderr, args...)
+	}
+	return c.systemdNspawnRun(ctx, proc, stdin, stdout, stderr, args...)
 }
 
 // Shutdown the container and unmount file system.
@@ -98,7 +96,7 @@ func (c *Container) Shutdown() error {
 	return c.machinectlShutdown()
 }
 
-// IsContainerActive returns whether the container is running or not.
+// IsActive returns whether the container is running or not.
 func (c *Container) IsActive() bool {
 	c.lock.RLock()
 	defer c.lock.RUnlock()

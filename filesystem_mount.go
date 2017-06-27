@@ -90,7 +90,7 @@ func (fs *FileSystem) IsBootable() bool {
 	return true
 }
 
-// IsFileSystemActive returns whether the file system has been mounted or not.
+// IsMounted returns whether the file system has been mounted or not.
 func (fs *FileSystem) IsMounted() bool {
 	fs.lock.RLock()
 	defer fs.lock.RUnlock()
