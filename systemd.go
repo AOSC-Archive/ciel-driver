@@ -15,7 +15,7 @@ func (c *Container) systemdNspawnBoot() {
 		"--quiet",
 		"--boot",
 		"-M", c.Name,
-		"-D", c.Fs.Target(),
+		"-D", c.Fs.TargetDir(),
 	}
 	for _, p := range c.properties {
 		args = append(args, "--property="+p)
@@ -113,7 +113,7 @@ func (c *Container) systemdNspawnRun(ctx context.Context, proc string, stdin io.
 	subArgs = append([]string{
 		"--quiet",
 		"-M", c.Name,
-		"-D", c.Fs.Target(),
+		"-D", c.Fs.TargetDir(),
 	}, subArgs...)
 	c.Fs.lock.RUnlock()
 

@@ -44,7 +44,7 @@ const WorkDirSuffix = ".work"
 func (fs *FileSystem) TopLayer() string {
 	return filepath.Join(fs.base, fs.layers[0])
 }
-func (fs *FileSystem) WorkDir() string {
+func (fs *FileSystem) TopLayerWorkDir() string {
 	return filepath.Join(fs.base, fs.layers[0]+WorkDirSuffix)
 }
 func (fs *FileSystem) Layer(name string) string {
@@ -60,17 +60,17 @@ func (fs *FileSystem) EnableAll() {
 		fs.layersMask[i] = true
 	}
 }
-func (fs *FileSystem) Disable(names ...string) {
+func (fs *FileSystem) DisableLayer(names ...string) {
 	for _, name := range names {
 		fs.layersMask[fs.layers.Index(name)] = false
 	}
 }
-func (fs *FileSystem) Enable(names ...string) {
+func (fs *FileSystem) EnableLayer(names ...string) {
 	for _, name := range names {
 		fs.layersMask[fs.layers.Index(name)] = true
 	}
 }
-func (fs *FileSystem) Target() string {
+func (fs *FileSystem) TargetDir() string {
 	return fs.target
 }
 
@@ -84,7 +84,7 @@ func (fs *FileSystem) IsBootable() bool {
 	if !fs.mounted {
 		return false
 	}
-	if _, err := os.Stat(fs.Target() + SystemdPath); os.IsNotExist(err) {
+	if _, err := os.Stat(fs.TargetDir() + SystemdPath); os.IsNotExist(err) {
 		return false
 	}
 	return true
@@ -117,9 +117,9 @@ func (fs *FileSystem) Mount() error {
 	}
 
 	fs.target = "/tmp/ciel." + randomFilename()
-	os.Mkdir(fs.Target(), 0755)
-	os.Mkdir(fs.WorkDir(), 0755)
-	reterr := fsMount(fs.Target(), fs.TopLayer(), fs.WorkDir(), lowersToMount)
+	os.Mkdir(fs.TargetDir(), 0755)
+	os.Mkdir(fs.TopLayerWorkDir(), 0755)
+	reterr := fsMount(fs.TargetDir(), fs.TopLayer(), fs.TopLayerWorkDir(), lowersToMount)
 	if reterr == nil {
 		fs.mounted = true
 	}
@@ -134,14 +134,14 @@ func (fs *FileSystem) Unmount() error {
 		return nil
 	}
 
-	if err := fsUnmount(fs.Target()); err != nil {
+	if err := fsUnmount(fs.TargetDir()); err != nil {
 		return err
 	}
 	defer func() {
 		fs.mounted = false
 	}()
-	err1 := os.Remove(fs.Target())
-	err2 := os.RemoveAll(fs.WorkDir())
+	err1 := os.Remove(fs.TargetDir())
+	err2 := os.RemoveAll(fs.TopLayerWorkDir())
 	if err2 != nil {
 		return err2
 	}

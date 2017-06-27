@@ -9,7 +9,7 @@ import (
 
 // Merge is the method to merge a file or directory from an upper layer
 // to a lower layer.
-func (fs *FileSystem) Merge(path, upper, lower string, excludeSelf bool) error {
+func (fs *FileSystem) MergeFile(path, upper, lower string, excludeSelf bool) error {
 	errResetWalk := errors.New("reset walk")
 	uroot, lroot := fs.Layer(upper), fs.Layer(lower)
 	lindex, maxindex := fs.layers.Index(lower), len(fs.layers)-1
