@@ -52,26 +52,10 @@ func (fs *FileSystem) Merge(path, upper, lower string, excludeSelf bool) error {
 					// the lower layer is a whiteout or a normal file, which can be a cover,
 					// that removing them may let the content in lower layers appear.
 
-					var nextfileindex = 0
-					var havedir = false
 					// if the lower layer is the bottom
-					// or lower layers under the lower layer have another cover.
-					if lindex != maxindex {
-					FindFileLoop:
-						for i := lindex + 1; i <= maxindex; i++ {
-							iroot := filepath.Join(fs.base, fs.layers[i])
-							ipath := filepath.Join(iroot, rel)
-							itp, _ := overlayTypeByLstat(ipath)
-							switch itp {
-							case overlayTypeFile, overlayTypeWhiteout:
-								nextfileindex = i
-								break FindFileLoop
-							case overlayTypeDir:
-								havedir = true
-							}
-						}
-					}
+					// or lower layers under the lower layer have another cover,
 					// we can merge the upper one safely.
+					nextfilelayer, havedir := fs.nextLayerHasFile(rel, lindex)
 					if !havedir {
 						os.Remove(lpath)
 						if err := os.Rename(upath, lpath); err != nil {
@@ -86,33 +70,7 @@ func (fs *FileSystem) Merge(path, upper, lower string, excludeSelf bool) error {
 						return err
 					}
 					// 2). "cover" all sub-files in the directory
-					filelist := make(map[string]bool)
-					for i := nextfileindex - 1; i > lindex; i-- {
-						iroot := filepath.Join(fs.base, fs.layers[i])
-						ipath := filepath.Join(iroot, rel)
-						iinfo, err := os.Lstat(ipath)
-						if os.IsNotExist(err) {
-							continue
-						}
-						idir, err := os.Open(ipath)
-						if err != nil {
-							continue
-						}
-						iinfos, err := idir.Readdir(0) // check all sub-files
-						if err != nil {
-							continue
-						}
-						for _, iiinfo := range iinfos {
-							iitp, _ := overlayTypeByInfo(iiinfo, nil)
-							if iitp == overlayTypeWhiteout {
-								delete(filelist, iinfo.Name())
-							} else {
-								filelist[iinfo.Name()] = true
-							}
-						}
-						idir.Close()
-					}
-					for filename := range filelist {
+					for filename := range fs.readDirInRange(rel, lindex+1, nextfilelayer-1) {
 						createWhiteout(filepath.Join(lpath, filename))
 					}
 					return nil
@@ -182,4 +140,54 @@ func isWhiteout(fi os.FileInfo) bool {
 		return false
 	}
 	return fi.Sys().(*syscall.Stat_t).Rdev == 0
+}
+
+func (fs *FileSystem) nextLayerHasFile(relpath string, startindex int) (index int, hasdir bool) {
+	index = len(fs.layers)
+	hasdir = false
+	if startindex != len(fs.layers)-1 {
+		for i := startindex + 1; i <= len(fs.layers)-1; i++ {
+			iroot := filepath.Join(fs.base, fs.layers[i])
+			ipath := filepath.Join(iroot, relpath)
+			itp, _ := overlayTypeByLstat(ipath)
+			switch itp {
+			case overlayTypeFile, overlayTypeWhiteout:
+				index = i
+				return
+			case overlayTypeDir:
+				hasdir = true
+			}
+		}
+	}
+	return
+}
+
+func (fs *FileSystem) readDirInRange(relpath string, lbound, ubound int) map[string]bool {
+	filelist := make(map[string]bool)
+	for i := ubound; i >= lbound; i-- {
+		iroot := filepath.Join(fs.base, fs.layers[i])
+		ipath := filepath.Join(iroot, relpath)
+		iinfo, err := os.Lstat(ipath)
+		if os.IsNotExist(err) {
+			continue
+		}
+		idir, err := os.Open(ipath)
+		if err != nil {
+			continue
+		}
+		iinfos, err := idir.Readdir(0) // 0: check all sub-files
+		if err != nil {
+			continue
+		}
+		for _, iiinfo := range iinfos {
+			iitp, _ := overlayTypeByInfo(iiinfo, nil)
+			if iitp == overlayTypeWhiteout {
+				delete(filelist, iinfo.Name())
+			} else {
+				filelist[iinfo.Name()] = true
+			}
+		}
+		idir.Close()
+	}
+	return filelist
 }
