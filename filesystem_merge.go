@@ -107,8 +107,15 @@ const (
 )
 
 func copyAttributes(src, dst string) error {
-	// TODO: copyAttributes: mode, uid, gid, context, attr, ...
-	return nil
+	args := []string{
+		"--no-target-directory",
+		"--recursive",
+		"--attributes-only",
+		src,
+		dst,
+	}
+	cmd := exec.Command("/bin/cp", args...)
+	return cmd.Run()
 }
 
 func createWhiteout(path string) error {
