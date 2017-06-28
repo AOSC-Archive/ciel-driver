@@ -3,6 +3,7 @@ package ciel
 import (
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"syscall"
 )
