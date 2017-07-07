@@ -2,6 +2,7 @@ package ciel
 
 import (
 	"errors"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -116,14 +117,20 @@ const (
 
 func copyAttributes(src, dst string) error {
 	args := []string{
+		"--preserve=all",
+		"--attributes-only",
 		"--no-target-directory",
 		"--recursive",
-		"--attributes-only",
+		"--no-clobber",
 		src,
 		dst,
 	}
 	cmd := exec.Command("/bin/cp", args...)
-	return cmd.Run()
+	b, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Println("FIXME: copyAttributes()", string(b))
+	}
+	return nil
 }
 
 func createWhiteout(path string) error {
