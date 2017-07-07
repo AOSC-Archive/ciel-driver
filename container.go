@@ -58,6 +58,11 @@ func (c *Container) Command(cmdline string) int {
 	return c.CommandContext(context.Background(), cmdline)
 }
 
+// Shell opens the shell in container.
+func (c *Container) Shell() int {
+	return c.ShellContext(context.Background())
+}
+
 // CommandRaw runs command in container.
 //
 // It will mount the root file system and start the container automatically,
@@ -72,6 +77,11 @@ func (c *Container) CommandRaw(proc string, stdin io.Reader, stdout, stderr io.W
 // CommandContext is Command() with context.
 func (c *Container) CommandContext(ctx context.Context, cmdline string) int {
 	return c.CommandRawContext(ctx, ShellPath, os.Stdin, os.Stdout, os.Stderr, "-l", "-c", cmdline)
+}
+
+// ShellContext is Shell() with context.
+func (c *Container) ShellContext(ctx context.Context) int {
+	return c.CommandRawContext(ctx, ShellPath, os.Stdin, os.Stdout, os.Stderr)
 }
 
 // CommandRawContext is CommandRaw() with context.
