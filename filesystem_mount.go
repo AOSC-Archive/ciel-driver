@@ -36,6 +36,21 @@ func (fs *FileSystem) IsMounted() bool {
 	return fs.mounted
 }
 
+func (fs *FileSystem) BuildDirs() (err error) {
+	e := os.Mkdir(fs.TopLayer(), 0755)
+	if e != nil && !os.IsExist(e) && err == nil {
+		err = e
+	}
+	for _, layer := range fs.layers {
+		dirname := filepath.Join(fs.base, layer)
+		e := os.Mkdir(dirname, 0755)
+		if e != nil && !os.IsExist(e) && err == nil {
+			err = e
+		}
+	}
+	return
+}
+
 // Mount the file system to a temporary directory.
 // It will be called automatically by CommandRaw().
 func (fs *FileSystem) Mount() error {
@@ -45,12 +60,14 @@ func (fs *FileSystem) Mount() error {
 		return nil
 	}
 
-	os.Mkdir(fs.TopLayer(), 0755)
+	if err := fs.BuildDirs(); err != nil {
+		return err
+	}
+
 	lowersToMount := []string{}
 	for i := range fs.layers {
 		if i != 0 && fs.layersMask[i] {
 			dirname := filepath.Join(fs.base, fs.layers[i])
-			os.Mkdir(dirname, 0755)
 			lowersToMount = append(lowersToMount, dirname)
 		}
 	}
