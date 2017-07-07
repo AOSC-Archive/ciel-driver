@@ -8,15 +8,16 @@ import (
 	"syscall"
 )
 
+var resetWalk = errors.New("reset walk")
+
 // MergeFile is the method to merge a file or directory from an upper layer
 // to a lower layer.
 func (fs *FileSystem) MergeFile(path, upper, lower string, excludeSelf bool) error {
-	errResetWalk := errors.New("reset walk")
 	uroot, lroot := fs.Layer(upper), fs.Layer(lower)
 	lindex, maxindex := fs.layers.Index(lower), len(fs.layers)-1
 	walkBase := filepath.Join(uroot, path)
-	var err = errResetWalk
-	for err == errResetWalk {
+	var err = resetWalk
+	for err == resetWalk {
 		err = filepath.Walk(walkBase, func(upath string, info os.FileInfo, err error) error {
 			if excludeSelf && upath == walkBase {
 				return nil
@@ -42,7 +43,7 @@ func (fs *FileSystem) MergeFile(path, upper, lower string, excludeSelf bool) err
 					if err := os.Rename(upath, lpath); err != nil {
 						return err
 					}
-					return errResetWalk // sub-file list has been affected, reset this process.
+					return resetWalk // sub-file list has been affected, reset this process.
 
 				case overlayTypeDir:
 					// copy attributes, and continue.
@@ -62,7 +63,7 @@ func (fs *FileSystem) MergeFile(path, upper, lower string, excludeSelf bool) err
 						if err := os.Rename(upath, lpath); err != nil {
 							return err
 						}
-						return errResetWalk
+						return resetWalk
 					}
 
 					// 1). "open" the directory
