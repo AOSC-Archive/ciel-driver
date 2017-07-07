@@ -104,15 +104,15 @@ func (fs *FileSystem) MergeFile(path, upper, lower string, excludeSelf bool) err
 	return err
 }
 
-type overlayType int
+type overlayType string
 
 const (
-	overlayTypeInvalid overlayType = iota
+	overlayTypeInvalid overlayType = "invalid value"
 
-	overlayTypeAir
-	overlayTypeWhiteout
-	overlayTypeFile
-	overlayTypeDir
+	overlayTypeAir      = "-"
+	overlayTypeWhiteout = "x"
+	overlayTypeFile     = "f"
+	overlayTypeDir      = "d"
 )
 
 func copyAttributes(src, dst string) error {
