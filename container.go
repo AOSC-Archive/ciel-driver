@@ -40,8 +40,9 @@ func New(name, baseDir string) *Container {
 	c.Fs = newFileSystem(baseDir, Layers{
 		"99-upperdir",
 		"50-cache",
-		"10-buildkit",
-		"01-stub-config",
+		"11-dist-overlay",
+		"10-dist",
+		"01-stub-overlay",
 		"00-stub",
 	})
 	return c
