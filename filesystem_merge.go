@@ -107,7 +107,7 @@ func (fs *FileSystem) MergeFile(path, upper, lower string, excludeSelf bool) err
 type overlayType string
 
 const (
-	overlayTypeInvalid overlayType = "invalid value"
+	overlayTypeInvalid overlayType = ""
 
 	overlayTypeAir      = "-"
 	overlayTypeWhiteout = "x"

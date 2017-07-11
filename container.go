@@ -10,6 +10,9 @@ import (
 // ShellPath is the path of shell in container.
 const ShellPath = "/bin/bash"
 
+// FileSystemLayers specifies the layer structure of file system
+var FileSystemLayers Layers
+
 // Container represents an instance of your container.
 //
 // FIXME: It's not coroutine-safe so far.
@@ -37,14 +40,7 @@ func New(name, baseDir string) *Container {
 		boot:       true,
 		cancelBoot: make(chan struct{}),
 	}
-	c.Fs = newFileSystem(baseDir, Layers{
-		"99-upperdir",
-		"50-cache",
-		"11-dist-overlay",
-		"10-dist",
-		"01-stub-overlay",
-		"00-stub",
-	})
+	c.Fs = newFileSystem(baseDir, FileSystemLayers)
 	return c
 }
 
