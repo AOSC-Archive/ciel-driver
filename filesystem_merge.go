@@ -14,6 +14,9 @@ var resetWalk = errors.New("reset walk")
 // MergeFile is the method to merge a file or directory from an upper layer
 // to a lower layer.
 func (fs *FileSystem) MergeFile(path, upper, lower string, excludeSelf bool) error {
+	if fs.IsMounted() {
+		panic("cannot merge the underlying file system when it has been mounted")
+	}
 	path = filepath.Clean(path)
 	uroot, lroot := fs.Layer(upper), fs.Layer(lower)
 	lindex, maxindex := fs.layers.Index(lower), len(fs.layers)-1
