@@ -54,6 +54,15 @@ func (fs *FileSystem) BuildDirs() (err error) {
 // Mount the file system to a temporary directory.
 // It will be called automatically by CommandRaw().
 func (fs *FileSystem) Mount() error {
+	return fs.mount(true)
+}
+
+// MountReadOnly mounts the file system to a temporary directory, read-only.
+func (fs *FileSystem) MountReadOnly() error {
+	return fs.mount(false)
+}
+
+func (fs *FileSystem) mount(rw bool) error {
 	fs.lock.Lock()
 	defer fs.lock.Unlock()
 	if fs.mounted {
