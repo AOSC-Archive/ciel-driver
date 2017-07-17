@@ -84,7 +84,7 @@ func (fs *FileSystem) mount(rw bool) error {
 	fs.target = "/tmp/ciel." + randomFilename()
 	os.Mkdir(fs.TargetDir(), 0755)
 	os.Mkdir(fs.TopLayerWorkDir(), 0755)
-	reterr := fsMount(fs.TargetDir(), fs.TopLayer(), fs.TopLayerWorkDir(), lowersToMount)
+	reterr := fsMount(fs.TargetDir(), rw, fs.TopLayer(), fs.TopLayerWorkDir(), lowersToMount)
 	if reterr == nil {
 		fs.mounted = true
 	}
@@ -125,9 +125,13 @@ func randomFilename() string {
 	return base64.RawURLEncoding.EncodeToString(rd)
 }
 
-func fsMount(path string, upperdir string, workdir string, lowerdirs []string) error {
+func fsMount(path string, rw bool, upperdir string, workdir string, lowerdirs []string) error {
+	rwOption := "ro,"
+	if rw {
+		rwOption = ""
+	}
 	return syscall.Mount("overlay", path, "overlay", 0,
-		"lowerdir="+strings.Join(lowerdirs, ":")+",upperdir="+upperdir+",workdir="+workdir)
+		rwOption+"lowerdir="+strings.Join(lowerdirs, ":")+",upperdir="+upperdir+",workdir="+workdir)
 }
 
 func fsUnmount(path string) error {
