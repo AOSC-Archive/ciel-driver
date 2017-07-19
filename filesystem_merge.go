@@ -2,106 +2,100 @@ package ciel
 
 import (
 	"errors"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"syscall"
 )
 
-var resetWalk = errors.New("reset walk")
-
 // MergeFile is the method to merge a file or directory from an upper layer
 // to a lower layer.
 func (fs *FileSystem) MergeFile(path, upper, lower string, excludeSelf bool) error {
 	if fs.IsMounted() {
-		panic("cannot merge the underlying file system when it has been mounted")
+		errlog.Panicln("MergeFile: cannot merge the underlying file system when it has been mounted")
 	}
 	path = filepath.Clean(path)
 	uroot, lroot := fs.Layer(upper), fs.Layer(lower)
 	lindex, maxindex := fs.layers.Index(lower), len(fs.layers)-1
 	walkBase := filepath.Join(uroot, path)
 	os.MkdirAll(filepath.Dir(filepath.Join(lroot, path)), 755)
-	var err = resetWalk
-	for err == resetWalk {
-		err = filepath.Walk(walkBase, func(upath string, info os.FileInfo, err error) error {
-			if excludeSelf && upath == walkBase {
-				return nil
-			}
-			rel, _ := filepath.Rel(uroot, upath)
-			lpath := filepath.Join(lroot, rel)
+	err = filepath.Walk(walkBase, func(upath string, info os.FileInfo, err error) error {
+		if excludeSelf && upath == walkBase {
+			return nil
+		}
+		rel, _ := filepath.Rel(uroot, upath)
+		lpath := filepath.Join(lroot, rel)
 
-			utp, err := overlayTypeByInfo(info, err)
-			if err != nil {
-				return err
-			}
-			ltp, err := overlayTypeByLstat(lpath)
-			if err != nil {
-				return err
-			}
+		utp, err := overlayTypeByInfo(info, err)
+		if err != nil {
+			return err
+		}
+		ltp, err := overlayTypeByLstat(lpath)
+		if err != nil {
+			return err
+		}
 
-			switch utp {
+		switch utp {
+		case overlayTypeAir:
+			return filepath.SkipDir
+		case overlayTypeDir:
+
+			switch ltp {
 			case overlayTypeAir:
+				// the lower layer had no effect on this position.
+				if err := os.Rename(upath, lpath); err != nil {
+					return err
+				}
 				return filepath.SkipDir
-			case overlayTypeDir:
 
-				switch ltp {
-				case overlayTypeAir:
-					// the lower layer had no effect on this position.
+			case overlayTypeDir:
+				// copy attributes, and continue.
+				return copyAttributes(upath, lpath)
+
+			default:
+				// the upper layer is a directory,
+				// the lower layer is a whiteout or a normal file, which can be a cover,
+				// that removing them may let the content in lower layers appear.
+
+				// if the lower layer is at the bottom
+				// or lower layers under the lower layer have another cover,
+				// we can merge the upper one safely.
+				nextfilelayer, havedir := fs.nextLayerHasFile(rel, lindex)
+				if !havedir {
+					os.Remove(lpath)
 					if err := os.Rename(upath, lpath); err != nil {
 						return err
 					}
-					return resetWalk // sub-file list has been affected, reset this process.
-
-				case overlayTypeDir:
-					// copy attributes, and continue.
-					return copyAttributes(upath, lpath)
-
-				default:
-					// the upper layer is a directory,
-					// the lower layer is a whiteout or a normal file, which can be a cover,
-					// that removing them may let the content in lower layers appear.
-
-					// if the lower layer is at the bottom
-					// or lower layers under the lower layer have another cover,
-					// we can merge the upper one safely.
-					nextfilelayer, havedir := fs.nextLayerHasFile(rel, lindex)
-					if !havedir {
-						os.Remove(lpath)
-						if err := os.Rename(upath, lpath); err != nil {
-							return err
-						}
-						return resetWalk
-					}
-
-					// 1). "open" the directory
-					os.Mkdir(lpath, 0000)
-					if err := copyAttributes(upath, lpath); err != nil {
-						return err
-					}
-					// 2). "cover" all sub-files in the directory
-					for filename := range fs.readDirInRange(rel, lindex+1, nextfilelayer-1) {
-						createWhiteout(filepath.Join(lpath, filename))
-					}
-					return nil
+					return filepath.SkipDir
 				}
 
-			default:
-				// the upper layer is a whiteout or a normal file, which acts as a cover.
-				os.RemoveAll(lpath)
-				err := os.Rename(upath, lpath)
-
-				// a whiteout applied to the bottom?
-				if lindex == maxindex && utp == overlayTypeWhiteout {
-					os.Remove(lpath)
+				// 1). "open" the directory
+				os.Mkdir(lpath, 0000)
+				if err := copyAttributes(upath, lpath); err != nil {
+					return err
 				}
-
-				return err
+				// 2). "cover" all sub-files in the directory
+				for filename := range fs.readDirInRange(rel, lindex+1, nextfilelayer-1) {
+					createWhiteout(filepath.Join(lpath, filename))
+				}
+				return nil
 			}
 
-			// end of walk-function
-		})
-	}
+		default:
+			// the upper layer is a whiteout or a normal file, which acts as a cover.
+			os.RemoveAll(lpath)
+			err := os.Rename(upath, lpath)
+
+			// a whiteout applied to the bottom?
+			if lindex == maxindex && utp == overlayTypeWhiteout {
+				os.Remove(lpath)
+			}
+
+			return err
+		}
+
+		// end of walk-function
+	})
 	if err == nil {
 		os.RemoveAll(walkBase)
 	}
