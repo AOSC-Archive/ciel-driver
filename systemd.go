@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"log"
 	"os/exec"
 	"syscall"
 	"time"
@@ -52,7 +53,31 @@ func (c *Container) systemdNspawnBoot() {
 }
 
 func (c *Container) isSystemRunning() bool {
-	return exec.Command("/usr/bin/systemctl", "is-system-running", "-M", c.Name).Run() == nil
+	a, err := exec.Command("/usr/bin/systemctl", "is-system-running", "-M", c.Name).Output()
+	if err != nil {
+		switch string(a) {
+		case "": // "Failed to connect to bus" => stderr, nothing in stdout.
+			return false
+
+		case "initializing", "starting", "offline":
+			return false
+
+		case "degraded":
+			log.Printf("container: systemd is running in %s mode\n", string(a))
+			return true
+
+		case "maintenance", "unknown":
+			close(c.cancelBoot)
+			log.Printf("container: systemd is running in %s mode, stopping\n", string(a))
+			return false
+
+		case "stopping":
+			close(c.cancelBoot)
+			log.Println("container: systemd is stopping")
+			return false
+		}
+	}
+	return true
 }
 
 func (c *Container) isSystemShutdown() bool {
