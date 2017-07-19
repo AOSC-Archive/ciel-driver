@@ -126,12 +126,13 @@ func randomFilename() string {
 }
 
 func fsMount(path string, rw bool, upperdir string, workdir string, lowerdirs []string) error {
-	rwOption := "ro,"
+	var option string
 	if rw {
-		rwOption = ""
+		option = "lowerdir=" + strings.Join(lowerdirs, ":") + ",upperdir=" + upperdir + ",workdir=" + workdir
+	} else {
+		option = "lowerdir=" + strings.Join(append(lowerdirs, upperdir), ":")
 	}
-	return syscall.Mount("overlay", path, "overlay", 0,
-		rwOption+"lowerdir="+strings.Join(lowerdirs, ":")+",upperdir="+upperdir+",workdir="+workdir)
+	return syscall.Mount("overlay", path, "overlay", 0, option)
 }
 
 func fsUnmount(path string) error {
