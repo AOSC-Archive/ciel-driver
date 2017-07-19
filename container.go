@@ -135,6 +135,7 @@ func (c *Container) SetProperties(properties []string) {
 		properties = []string{}
 	}
 	c.properties = properties
+	infolog.Printf("properties = %v\n", c.properties)
 	c.lock.Unlock()
 }
 
@@ -149,5 +150,6 @@ func (c *Container) SetProperties(properties []string) {
 func (c *Container) SetProperty(property string) {
 	c.lock.Lock()
 	c.properties = append(c.properties, property)
+	infolog.Printf("properties = %v\n", c.properties)
 	c.lock.Unlock()
 }
