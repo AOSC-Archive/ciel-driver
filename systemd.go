@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"io"
-	"log"
 	"os/exec"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -21,12 +21,15 @@ func (c *Container) systemdNspawnBoot() {
 	for _, p := range c.properties {
 		args = append(args, "--property="+p)
 	}
+	dbglog.Println("systemdNspawnBoot: cmd <= /usr/bin/systemd-nspawn", args)
 	cmd := exec.Command("/usr/bin/systemd-nspawn", args...)
 	c.Fs.lock.RUnlock()
+	infolog.Println("systemd-nspawn --boot")
 	if err := cmd.Start(); err != nil {
-		panic(err)
+		errlog.Panic(err)
 	}
 	go func() {
+		dbglog.Println("systemdNspawnBoot: goroutine started: wait for process")
 		if err := cmd.Wait(); err != nil {
 			c.lock.Lock()
 			if c.booted {
@@ -35,25 +38,30 @@ func (c *Container) systemdNspawnBoot() {
 				c.cancelBoot = make(chan struct{})
 			}
 			c.lock.Unlock()
+			warnlog.Println("systemdNspawnBoot: cmd.Wait() => ", err)
 		}
+		dbglog.Println("systemdNspawnBoot: goroutine stopped")
 	}()
 
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
+	infolog.Println("wait for booted...")
 	for !c.isSystemRunning() {
 		select {
 		case <-c.cancelBoot:
-			panic("container dead")
+			errlog.Panic("container dead")
 		default:
 			time.Sleep(time.Millisecond * 100)
 		}
 	}
 	c.booted = true
+	infolog.Println("wait for booted...OK")
 }
 
 func (c *Container) isSystemRunning() bool {
 	a, err := exec.Command("/usr/bin/systemctl", "is-system-running", "-M", c.Name).Output()
+	dbglog.Println("isSystemRunning:", err, strings.TrimSpace(string(a)))
 	if err != nil {
 		switch string(a) {
 		case "": // "Failed to connect to bus" => stderr, nothing in stdout.
@@ -63,17 +71,17 @@ func (c *Container) isSystemRunning() bool {
 			return false
 
 		case "degraded":
-			log.Printf("container: systemd is running in %s mode\n", string(a))
+			warnlog.Printf("container: systemd is running in %s mode\n", strings.TrimSpace(string(a)))
 			return true
 
 		case "maintenance", "unknown":
 			close(c.cancelBoot)
-			log.Printf("container: systemd is running in %s mode, stopping\n", string(a))
+			errlog.Printf("container: systemd is running in %s mode, stopping\n", strings.TrimSpace(string(a)))
 			return false
 
 		case "stopping":
 			close(c.cancelBoot)
-			log.Println("container: systemd is stopping")
+			errlog.Println("container: systemd is stopping")
 			return false
 		}
 	}
@@ -81,7 +89,9 @@ func (c *Container) isSystemRunning() bool {
 }
 
 func (c *Container) isSystemShutdown() bool {
-	return exec.Command("/usr/bin/machinectl", "status", c.Name).Run() != nil
+	err := exec.Command("/usr/bin/machinectl", "status", c.Name).Run()
+	dbglog.Printf("isSystemShutdown: want err != nil, have err == %v\n", err)
+	return err != nil
 }
 
 func (c *Container) machinectlShutdown() error {
@@ -90,21 +100,27 @@ func (c *Container) machinectlShutdown() error {
 
 	var cmd *exec.Cmd
 	if c.booted {
+		dbglog.Println("machinectlShutdown: cmd <= /usr/bin/machinectl", "poweroff")
 		cmd = exec.Command("/usr/bin/machinectl", "poweroff", c.Name)
 	} else if c.chrooted {
+		dbglog.Println("machinectlShutdown: cmd <= /usr/bin/machinectl", "terminate")
 		cmd = exec.Command("/usr/bin/machinectl", "terminate", c.Name)
 	} else {
+		dbglog.Println("machinectlShutdown: no-op")
 		return nil
 	}
 
-	b, err := cmd.CombinedOutput()
+	a, err := cmd.CombinedOutput()
 	if err != nil {
-		return errors.New(string(b))
+		dbglog.Println("machinectlShutdown: error", strings.TrimSpace(string(a)))
+		return errors.New(string(a))
 	}
 
+	infolog.Println("wait for shutdown...")
 	for !c.isSystemShutdown() {
 		time.Sleep(time.Millisecond * 100)
 	}
+	infolog.Println("wait for shutdown...OK")
 	c.booted = false
 	close(c.cancelBoot)
 	c.cancelBoot = make(chan struct{})
@@ -116,7 +132,7 @@ func (c *Container) systemdRun(ctx context.Context, proc string, stdin io.Reader
 	booted := c.booted
 	c.lock.RUnlock()
 	if !booted {
-		panic("container is down")
+		errlog.Panic("container is down")
 	}
 	subArgs := append([]string{proc}, args...)
 	subArgs = append([]string{
@@ -125,12 +141,13 @@ func (c *Container) systemdRun(ctx context.Context, proc string, stdin io.Reader
 		"--pty",
 		"-M", c.Name,
 	}, subArgs...)
+	infolog.Println("systemd-run")
 	return cmd(ctx, "/usr/bin/systemd-run", stdin, stdout, stderr, subArgs...)
 }
 
 func (c *Container) systemdNspawnRun(ctx context.Context, proc string, stdin io.Reader, stdout, stderr io.Writer, args ...string) int {
 	if c.IsActive() {
-		panic("another chroot-mode instance is running")
+		errlog.Panic("another chroot-mode instance is running")
 	}
 
 	subArgs := append([]string{proc}, args...)
@@ -150,17 +167,19 @@ func (c *Container) systemdNspawnRun(ctx context.Context, proc string, stdin io.
 		c.chrooted = false
 		c.lock.Unlock()
 	}()
+	infolog.Println("systemd-nspawn")
 	return cmd(ctx, "/usr/bin/systemd-nspawn", stdin, stdout, stderr, subArgs...)
 }
 
 func cmd(ctx context.Context, proc string, stdin io.Reader, stdout, stderr io.Writer, args ...string) int {
+	dbglog.Println("cmd:", proc, args)
 	cmd := exec.CommandContext(ctx, proc, args...)
 	cmd.Stdin = stdin
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
 	err := cmd.Start()
 	if err != nil {
-		panic(err)
+		errlog.Panic(err)
 	}
 	err = cmd.Wait()
 	if err == nil {
@@ -168,7 +187,9 @@ func cmd(ctx context.Context, proc string, stdin io.Reader, stdout, stderr io.Wr
 	}
 	if exitError, ok := err.(*exec.ExitError); ok {
 		exitStatus := exitError.Sys().(syscall.WaitStatus)
+		dbglog.Println("cmd: exitStatus =", exitStatus.ExitStatus())
 		return exitStatus.ExitStatus()
 	}
-	panic(err)
+	errlog.Panic(err)
+	return 1
 }

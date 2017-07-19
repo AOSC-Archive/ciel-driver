@@ -130,9 +130,9 @@ func copyAttributes(src, dst string) error {
 		dst,
 	}
 	cmd := exec.Command("/bin/cp", args...)
-	b, err := cmd.CombinedOutput()
+	a, err := cmd.CombinedOutput()
 	if err != nil {
-		log.Println("FIXME: copyAttributes()", string(b))
+		warnlog.Println("copyAttributes: FIXME:", strings.TrimSpace(string(a)))
 	}
 	return nil
 }

@@ -19,13 +19,13 @@ const SystemdPath = "/usr/lib/systemd/systemd"
 func (fs *FileSystem) IsBootable() bool {
 	fs.lock.RLock()
 	defer fs.lock.RUnlock()
-
 	if !fs.mounted {
 		return false
 	}
 	if _, err := os.Stat(fs.TargetDir() + SystemdPath); os.IsNotExist(err) {
 		return false
 	}
+	infolog.Println("IsBootable: true")
 	return true
 }
 
@@ -38,14 +38,20 @@ func (fs *FileSystem) IsMounted() bool {
 
 func (fs *FileSystem) BuildDirs() (err error) {
 	e := os.Mkdir(fs.TopLayer(), 0755)
-	if e != nil && !os.IsExist(e) && err == nil {
-		err = e
+	if e != nil && !os.IsExist(e) {
+		errlog.Println("BuildDirs: os.Mkdir() =>", e)
+		if err == nil {
+			err = e
+		}
 	}
 	for _, layer := range fs.layers {
 		dirname := filepath.Join(fs.base, layer)
 		e := os.Mkdir(dirname, 0755)
-		if e != nil && !os.IsExist(e) && err == nil {
-			err = e
+		if e != nil && !os.IsExist(e) {
+			errlog.Println("BuildDirs: os.Mkdir() =>", e)
+			if err == nil {
+				err = e
+			}
 		}
 	}
 	return
@@ -132,9 +138,17 @@ func fsMount(path string, rw bool, upperdir string, workdir string, lowerdirs []
 	} else {
 		option = "lowerdir=" + strings.Join(append(lowerdirs, upperdir), ":")
 	}
-	return syscall.Mount("overlay", path, "overlay", 0, option)
+	infolog.Println("mount", path)
+	dbglog.Println("fsMount: syscall.Mount() <=", path, option)
+	err := syscall.Mount("overlay", path, "overlay", 0, option)
+	dbglog.Println("fsMount: syscall.Mount() =>", err)
+	return err
 }
 
 func fsUnmount(path string) error {
-	return syscall.Unmount(path, 0)
+	infolog.Println("umount", path)
+	dbglog.Println("fsUnmount: syscall.Unmount() <=", path)
+	err := syscall.Unmount(path, 0)
+	dbglog.Println("fsUnmount: syscall.Unmount() =>", err)
+	return err
 }
