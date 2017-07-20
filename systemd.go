@@ -10,6 +10,13 @@ import (
 	"time"
 )
 
+const (
+	SystemdNspawnProc = "systemd-nspawn"
+	SystemdRunProc    = "systemd-run"
+	MachinectlnProc   = "machinectl"
+	SystemctlnProc    = "systemctl"
+)
+
 func (c *Container) systemdNspawnBoot() {
 	c.Fs.lock.RLock()
 	args := []string{
@@ -21,8 +28,8 @@ func (c *Container) systemdNspawnBoot() {
 	for _, p := range c.properties {
 		args = append(args, "--property="+p)
 	}
-	dbglog.Println("systemdNspawnBoot: cmd <= /usr/bin/systemd-nspawn", args)
-	cmd := exec.Command("/usr/bin/systemd-nspawn", args...)
+	dbglog.Println("systemdNspawnBoot:", args)
+	cmd := exec.Command(SystemdNspawnProc, args...)
 	c.Fs.lock.RUnlock()
 	infolog.Println("systemd-nspawn --boot")
 	if err := cmd.Start(); err != nil {
@@ -60,7 +67,10 @@ func (c *Container) systemdNspawnBoot() {
 }
 
 func (c *Container) isSystemRunning() bool {
-	a, err := exec.Command("/usr/bin/systemctl", "is-system-running", "-M", c.Name).Output()
+	a, err := exec.Command(SystemdNspawnProc, "is-system-running", "-M", c.Name).Output()
+	if _, ok := err.(*exec.ExitError); !ok {
+		errlog.Panic(err)
+	}
 	dbglog.Println("isSystemRunning:", err, strings.TrimSpace(string(a)))
 	if err != nil {
 		switch string(a) {
@@ -89,7 +99,10 @@ func (c *Container) isSystemRunning() bool {
 }
 
 func (c *Container) isSystemShutdown() bool {
-	err := exec.Command("/usr/bin/machinectl", "status", c.Name).Run()
+	err := exec.Command(MachinectlnProc, "status", c.Name).Run()
+	if _, ok := err.(*exec.ExitError); !ok {
+		errlog.Panic(err)
+	}
 	dbglog.Printf("isSystemShutdown: want err != nil, have err == %v\n", err)
 	return err != nil
 }
@@ -100,11 +113,11 @@ func (c *Container) machinectlShutdown() error {
 
 	var cmd *exec.Cmd
 	if c.booted {
-		dbglog.Println("machinectlShutdown: cmd <= /usr/bin/machinectl", "poweroff")
-		cmd = exec.Command("/usr/bin/machinectl", "poweroff", c.Name)
+		dbglog.Println("machinectlShutdown: poweroff")
+		cmd = exec.Command(MachinectlnProc, "poweroff", c.Name)
 	} else if c.chrooted {
-		dbglog.Println("machinectlShutdown: cmd <= /usr/bin/machinectl", "terminate")
-		cmd = exec.Command("/usr/bin/machinectl", "terminate", c.Name)
+		dbglog.Println("machinectlShutdown: terminate")
+		cmd = exec.Command(MachinectlnProc, "terminate", c.Name)
 	} else {
 		dbglog.Println("machinectlShutdown: no-op")
 		return nil
@@ -142,7 +155,7 @@ func (c *Container) systemdRun(ctx context.Context, proc string, stdin io.Reader
 		"-M", c.Name,
 	}, subArgs...)
 	infolog.Println("systemd-run")
-	return cmd(ctx, "/usr/bin/systemd-run", stdin, stdout, stderr, subArgs...)
+	return cmd(ctx, SystemdRunProc, stdin, stdout, stderr, subArgs...)
 }
 
 func (c *Container) systemdNspawnRun(ctx context.Context, proc string, stdin io.Reader, stdout, stderr io.Writer, args ...string) int {
@@ -168,7 +181,7 @@ func (c *Container) systemdNspawnRun(ctx context.Context, proc string, stdin io.
 		c.lock.Unlock()
 	}()
 	infolog.Println("systemd-nspawn")
-	return cmd(ctx, "/usr/bin/systemd-nspawn", stdin, stdout, stderr, subArgs...)
+	return cmd(ctx, SystemdNspawnProc, stdin, stdout, stderr, subArgs...)
 }
 
 func cmd(ctx context.Context, proc string, stdin io.Reader, stdout, stderr io.Writer, args ...string) int {
