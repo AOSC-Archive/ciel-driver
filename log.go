@@ -2,25 +2,21 @@ package ciel
 
 import (
 	"io/ioutil"
-	stdlog "log"
+	"log"
 	"os"
-	"strconv"
 )
 
-const logFlags = stdlog.Lshortfile | stdlog.Ltime
+const logFlags = log.Lshortfile | log.Ltime
 
 var (
-	errlog  = stdlog.New(os.Stderr, "\033[31;1m[ERR ]\033[0m ", logFlags)
-	warnlog = stdlog.New(os.Stderr, "\033[33;1m[WARN]\033[0m ", logFlags)
-	infolog = stdlog.New(os.Stderr, "\033[32;1m[INFO]\033[0m ", logFlags)
-	dbglog  = stdlog.New(os.Stderr, "\033[39;1m[DBG ]\033[0m ", logFlags)
+	errlog  = log.New(os.Stderr, "\033[31;1m[ERR ]\033[0m ", logFlags)
+	warnlog = log.New(os.Stderr, "\033[33;1m[WARN]\033[0m ", logFlags)
+	infolog = log.New(os.Stderr, "\033[32;1m[INFO]\033[0m ", logFlags)
+	dbglog  = log.New(os.Stderr, "\033[39;1m[DBG ]\033[0m ", logFlags)
 )
 
-var LogLevel = 0
-
-func init() {
-	LogLevel, _ = strconv.Atoi(os.Getenv("CIEL_LOGLEVEL"))
-	switch LogLevel {
+func SetLogLevel(logLevel int) {
+	switch logLevel {
 	case -1:
 		errlog.SetOutput(ioutil.Discard)
 		fallthrough
