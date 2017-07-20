@@ -1,4 +1,4 @@
-package main
+package ciel
 
 import (
 	"io/ioutil"
