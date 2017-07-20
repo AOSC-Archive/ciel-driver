@@ -26,7 +26,8 @@ func (ll Layers) Index(name string) int {
 			return pos
 		}
 	}
-	panic("no such layer: " + name)
+	errlog.Panicln("no such layer: " + name)
+	return -1
 }
 
 // FileSystem contains the layers of overlay file system and implements
