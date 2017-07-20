@@ -187,7 +187,7 @@ func cmd(ctx context.Context, proc string, stdin io.Reader, stdout, stderr io.Wr
 	}
 	if exitError, ok := err.(*exec.ExitError); ok {
 		exitStatus := exitError.Sys().(syscall.WaitStatus)
-		dbglog.Println("cmd: exitStatus =", exitStatus.ExitStatus())
+		infolog.Println("exit status =", exitStatus.ExitStatus())
 		return exitStatus.ExitStatus()
 	}
 	errlog.Panic(err)
