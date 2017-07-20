@@ -11,7 +11,7 @@ import (
 
 // SystemdPath is the path of systemd's excutable binary file in container.
 // We use it to determine if the container has installed Systemd.
-const SystemdPath = "/usr/lib/systemd/systemd"
+const SystemdPath = "/lib/systemd/systemd"
 
 // IsBootable returns whether the file system is bootable or not.
 //

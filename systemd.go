@@ -20,7 +20,6 @@ const (
 func (c *Container) systemdNspawnBoot() {
 	c.Fs.lock.RLock()
 	args := []string{
-		"--quiet",
 		"--boot",
 		"-M", c.Name,
 		"-D", c.Fs.TargetDir(),
@@ -67,13 +66,13 @@ func (c *Container) systemdNspawnBoot() {
 }
 
 func (c *Container) isSystemRunning() bool {
-	a, err := exec.Command(SystemdNspawnProc, "is-system-running", "-M", c.Name).Output()
-	if _, ok := err.(*exec.ExitError); !ok {
-		errlog.Panic(err)
-	}
+	a, err := exec.Command(SystemctlnProc, "is-system-running", "-M", c.Name).Output()
 	dbglog.Println("isSystemRunning:", err, strings.TrimSpace(string(a)))
 	if err != nil {
-		switch string(a) {
+		if _, ok := err.(*exec.ExitError); !ok {
+			errlog.Panic(err)
+		}
+		switch strings.TrimSpace(string(a)) {
 		case "": // "Failed to connect to bus" => stderr, nothing in stdout.
 			return false
 
@@ -100,10 +99,12 @@ func (c *Container) isSystemRunning() bool {
 
 func (c *Container) isSystemShutdown() bool {
 	err := exec.Command(MachinectlnProc, "status", c.Name).Run()
-	if _, ok := err.(*exec.ExitError); !ok {
-		errlog.Panic(err)
-	}
 	dbglog.Printf("isSystemShutdown: want err != nil, have err == %v\n", err)
+	if err != nil {
+		if _, ok := err.(*exec.ExitError); !ok {
+			errlog.Panic(err)
+		}
+	}
 	return err != nil
 }
 
