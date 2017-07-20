@@ -7,20 +7,20 @@ import (
 	"strconv"
 )
 
-const logFlags = stdlog.Lshortfile | stdlog.LstdFlags
+const logFlags = stdlog.Lshortfile | stdlog.Ltime
 
 var (
-	errlog  = stdlog.New(os.Stderr, "[\033[31mERR \033[0m] ", logFlags)
-	warnlog = stdlog.New(os.Stderr, "[\033[33mWARN\033[0m] ", logFlags)
-	infolog = stdlog.New(os.Stderr, "[\033[32mINFO\033[0m] ", logFlags)
-	dbglog  = stdlog.New(os.Stderr, "[\033[39mDBG \033[0m] ", logFlags)
+	errlog  = stdlog.New(os.Stderr, "\033[31;1m[ERR ]\033[0m ", logFlags)
+	warnlog = stdlog.New(os.Stderr, "\033[33;1m[WARN]\033[0m ", logFlags)
+	infolog = stdlog.New(os.Stderr, "\033[32;1m[INFO]\033[0m ", logFlags)
+	dbglog  = stdlog.New(os.Stderr, "\033[39;1m[DBG ]\033[0m ", logFlags)
 )
 
-var LogLevel = 3 // 0 1 2 3
+var LogLevel = 0
 
 func init() {
-	i, _ := strconv.Atoi(os.Getenv("CIEL_LOGLEVEL"))
-	switch i {
+	LogLevel, _ = strconv.Atoi(os.Getenv("CIEL_LOGLEVEL"))
+	switch LogLevel {
 	case -1:
 		errlog.SetOutput(ioutil.Discard)
 		fallthrough
@@ -32,8 +32,5 @@ func init() {
 		fallthrough
 	case 2:
 		dbglog.SetOutput(ioutil.Discard)
-		fallthrough
-	case 3:
-		// No-op
 	}
 }
