@@ -115,7 +115,7 @@ func (c *Container) machinectlShutdown() error {
 	var cmd *exec.Cmd
 	if c.booted {
 		dbglog.Println("machinectlShutdown: poweroff")
-		cmd = exec.Command(MachinectlnProc, "poweroff", c.Name)
+		cmd = exec.Command(MachinectlnProc, "shell", c.Name, "/bin/systemctl", "poweroff")
 	} else if c.chrooted {
 		dbglog.Println("machinectlShutdown: terminate")
 		cmd = exec.Command(MachinectlnProc, "terminate", c.Name)
